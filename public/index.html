@@ -227,21 +227,40 @@
                     this.elements.resultsContainer.innerHTML = '';
                     this.elements.resultsHeader.textContent = '';
                 },
-
+                
+                // REWRITTEN to be more robust and include error logging
                 renderResults(results) {
+                    console.log("Attempting to render results:", results);
+
+                    if (!this.elements.resultsContainer || !this.elements.resultsHeader) {
+                        console.error("renderResults failed: resultsContainer or resultsHeader element not found.");
+                        return;
+                    }
+
                     this.elements.resultsContainer.innerHTML = '';
                     this.elements.resultsHeader.textContent = `Found ${results?.length || 0} recipe(s).`;
+                    
                     if (!results || results.length === 0) {
                         this.elements.resultsContainer.innerHTML = '<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-sm"><p>Try a different search term.</p></div>';
                         return;
                     }
-                    results.forEach(recipe => {
-                        const card = document.createElement('div');
-                        card.className = 'bg-white p-5 rounded-xl shadow-md flex justify-between items-center cursor-pointer hover:shadow-lg hover:scale-105 transition-transform duration-200';
-                        card.innerHTML = `<div><span class="text-sm font-semibold text-blue-600">Recipe #${recipe.id}</span><h3 class="text-xl font-bold text-gray-800">${recipe.name}</h3></div><button class="bg-gray-800 text-white font-semibold px-4 py-2 rounded-lg hover:bg-black transition">View</button>`;
-                        card.addEventListener('click', () => this.showRecipeDetails(recipe.id));
-                        this.elements.resultsContainer.appendChild(card);
-                    });
+
+                    try {
+                        results.forEach(recipe => {
+                            if (!recipe || typeof recipe.id === 'undefined' || typeof recipe.name === 'undefined') {
+                                console.warn("Skipping invalid recipe object:", recipe);
+                                return; // Skip this iteration if the recipe object is malformed
+                            }
+                            const card = document.createElement('div');
+                            card.className = 'bg-white p-5 rounded-xl shadow-md flex justify-between items-center cursor-pointer hover:shadow-lg hover:scale-105 transition-transform duration-200';
+                            card.innerHTML = `<div><span class="text-sm font-semibold text-blue-600">Recipe #${recipe.id}</span><h3 class="text-xl font-bold text-gray-800">${recipe.name}</h3></div><button class="bg-gray-800 text-white font-semibold px-4 py-2 rounded-lg hover:bg-black transition">View</button>`;
+                            card.addEventListener('click', () => this.showRecipeDetails(recipe.id));
+                            this.elements.resultsContainer.appendChild(card);
+                        });
+                    } catch (error) {
+                        console.error("An error occurred inside the renderResults loop:", error);
+                        this.renderError();
+                    }
                 },
 
                 renderError() {
@@ -304,11 +323,11 @@
                 async fetchUserInfo() {
                     try {
                         const identity = await this.apiRequest('/cdn-cgi/access/get-identity');
-                        if (identity && identity.email) {
+                        if (this.elements.userEmail && identity && identity.email) {
                             this.elements.userEmail.textContent = 'Logged in as: ' + identity.email;
                         }
                     } catch (e) {
-                         this.elements.userEmail.textContent = 'Not logged in (this is normal for local testing).';
+                         if(this.elements.userEmail) this.elements.userEmail.textContent = 'Not logged in (this is normal for local testing).';
                     }
                 }
             };
