@@ -1,106 +1,92 @@
 // This file defines the backend API for your recipe application.
-// It now supports multiple users and meal logging.
+// This version includes the corrected headers for all responses.
 
 interface Env {
   DB: D1Database;
 }
 
-// --- Helper function to get user's email from Cloudflare Access ---
-// Cloudflare Access passes the user's identity in a request header.
-// This function safely retrieves it.
+// Helper function to get user's email from Cloudflare Access
 function getUserId(request: Request): string | null {
-  const GIVEN_EMAIL = request.headers.get("Cf-Access-Authenticated-User-Email");
-  if (GIVEN_EMAIL) {
-    return GIVEN_EMAIL;
-  }
-  return null;
+  return request.headers.get("Cf-Access-Authenticated-User-Email");
 }
 
-// The main function that handles all incoming requests.
+// Helper function to create a JSON response with correct headers
+function jsonResponse(data: any, status = 200) {
+    return new Response(JSON.stringify(data), {
+        status: status,
+        headers: { 'Content-Type': 'application/json' }
+    });
+}
+
 export const onRequest: PagesFunction<Env> = async (context) => {
-  const { request, env, next } = context;
+  const { request, env } = context;
   const url = new URL(request.url);
 
   // --- Handle POST requests for creating new logs ---
   if (request.method === 'POST') {
     const userId = getUserId(request);
-    if (!userId) {
-      return new Response(JSON.stringify({ error: 'Authentication required. Please log in.' }), { status: 401 });
-    }
+    if (!userId) return jsonResponse({ error: 'Authentication required.' }, 401);
     
-    // Route to add a new meal log entry
     if (url.pathname === '/api/log') {
       try {
         const { recipe_id, eaten_date, notes } = await request.json();
-        if (!recipe_id || !eaten_date) {
-          return new Response(JSON.stringify({ error: 'Recipe ID and eaten date are required.' }), { status: 400 });
-        }
+        if (!recipe_id || !eaten_date) return jsonResponse({ error: 'Recipe ID and eaten date are required.' }, 400);
         
-        const stmt = env.DB.prepare(
+        await env.DB.prepare(
           'INSERT INTO meal_log (recipe_id, user_id, eaten_date, notes) VALUES (?1, ?2, ?3, ?4)'
-        );
-        await stmt.bind(recipe_id, userId, eaten_date, notes || null).run();
+        ).bind(recipe_id, userId, eaten_date, notes || null).run();
         
-        return new Response(JSON.stringify({ success: true }), { status: 201 });
+        return jsonResponse({ success: true }, 201);
       } catch (e) {
-        return new Response(JSON.stringify({ error: 'Invalid request body.' }), { status: 400 });
+        return jsonResponse({ error: 'Invalid request body.' }, 400);
       }
     }
   }
 
   // --- Handle GET requests for fetching data ---
   if (request.method === 'GET') {
-    // Define URL patterns for GET routes
-    const nameSearchPattern = new URLPattern({ pathname: '/api/recipes/search/name' });
-    const ingredientSearchPattern = new URLPattern({ pathname: '/api/recipes/search/ingredient' });
-    const singleRecipePattern = new URLPattern({ pathname: '/api/recipes/:id' });
-    const countPattern = new URLPattern({ pathname: '/api/recipes/count' });
-    const userLogPattern = new URLPattern({ pathname: '/api/log' });
-    const recipeLogPattern = new URLPattern({ pathname: '/api/recipes/:id/log' });
-
     const userId = getUserId(request);
     
     // --- Get Total Recipe Count ---
-    if (countPattern.test(url)) {
+    if (url.pathname === '/api/recipes/count') {
       const { count } = await env.DB.prepare('SELECT COUNT(*) as count FROM recipes').first<{ count: number }>();
-      return new Response(JSON.stringify({ total: count || 0 }));
+      return jsonResponse({ total: count || 0 });
     }
 
     // --- Search by Recipe Name ---
-    if (nameSearchPattern.test(url)) {
-      const query = url.searchParams.get('q');
+    if (url.pathname === '/api/recipes/search/name') {
+      const query = url.searchParams.get('q') || '';
       const stmt = env.DB.prepare('SELECT id, name FROM recipes WHERE LOWER(name) LIKE ?1');
       const { results } = await stmt.bind(`%${query.toLowerCase()}%`).all();
-      return new Response(JSON.stringify(results || []));
+      return jsonResponse(results || []);
     }
 
     // --- Search by Ingredients ---
-    if (ingredientSearchPattern.test(url)) {
-      const query = url.searchParams.get('q');
+    if (url.pathname === '/api/recipes/search/ingredient') {
+      const query = url.searchParams.get('q') || '';
       const ingredients = query.split(',').map(ing => ing.trim().toLowerCase()).filter(ing => ing);
-      if (ingredients.length === 0) return new Response(JSON.stringify([]));
+      if (ingredients.length === 0) return jsonResponse([]);
       
       const whereClauses = ingredients.map(() => 'LOWER(ingredients) LIKE ?');
       const sqlQuery = `SELECT id, name FROM recipes WHERE ${whereClauses.join(' AND ')}`;
-      const queryParams = ingredients.map(ing => `%${ing.toLowerCase()}%`);
+      const queryParams = ingredients.map(ing => `%${ing}%`);
       const stmt = env.DB.prepare(sqlQuery);
       const { results } = await stmt.bind(...queryParams).all();
-      return new Response(JSON.stringify(results || []));
+      return jsonResponse(results || []);
     }
-
+    
     // --- Get a Single Recipe by ID ---
-    if (singleRecipePattern.test(url)) {
-      const id = singleRecipePattern.exec(url).pathname.groups.id;
+    if (url.pathname.startsWith('/api/recipes/') && url.pathname.endsWith('/log') === false) {
+      const id = url.pathname.split('/')[3];
       const recipeData = await env.DB.prepare('SELECT * FROM recipes WHERE id = ?1').bind(id).first();
-      if (!recipeData) return new Response(JSON.stringify({ error: 'Recipe not found.' }), { status: 404 });
+      if (!recipeData) return jsonResponse({ error: 'Recipe not found.' }, 404);
       const recipe = { ...recipeData, ingredients: JSON.parse(recipeData.ingredients as string), instructions: JSON.parse(recipeData.instructions as string) };
-      return new Response(JSON.stringify(recipe));
+      return jsonResponse(recipe);
     }
 
     // --- Get All Meal Logs for the Current User ---
-    if (userLogPattern.test(url)) {
-      if (!userId) return new Response(JSON.stringify({ error: 'Authentication required.' }), { status: 401 });
-      // Join with recipes table to get the recipe name
+    if (url.pathname === '/api/log') {
+      if (!userId) return jsonResponse({ error: 'Authentication required.' }, 401);
       const stmt = env.DB.prepare(`
         SELECT ml.eaten_date, ml.notes, r.id as recipe_id, r.name as recipe_name 
         FROM meal_log ml 
@@ -109,19 +95,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         ORDER BY ml.eaten_date DESC
       `);
       const { results } = await stmt.bind(userId).all();
-      return new Response(JSON.stringify(results || []));
+      return jsonResponse(results || []);
     }
 
     // --- Get Meal Logs for a Specific Recipe for the Current User ---
-    if (recipeLogPattern.test(url)) {
-      if (!userId) return new Response(JSON.stringify({ error: 'Authentication required.' }), { status: 401 });
-      const id = recipeLogPattern.exec(url).pathname.groups.id;
+    if (url.pathname.startsWith('/api/recipes/') && url.pathname.endsWith('/log')) {
+      if (!userId) return jsonResponse({ error: 'Authentication required.' }, 401);
+      const id = url.pathname.split('/')[3];
       const stmt = env.DB.prepare('SELECT eaten_date, notes FROM meal_log WHERE recipe_id = ?1 AND user_id = ?2 ORDER BY eaten_date DESC');
       const { results } = await stmt.bind(id, userId).all();
-      return new Response(JSON.stringify(results || []));
+      return jsonResponse(results || []);
     }
   }
 
   // Fallback for any unhandled routes
-  return new Response("Not Found", { status: 404 });
+  return jsonResponse({ error: "Not Found" }, 404);
 };
