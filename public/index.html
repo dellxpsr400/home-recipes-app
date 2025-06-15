@@ -186,7 +186,7 @@
                         const logs = await this.apiRequest('/api/log');
                         this.elements.logContainer.innerHTML = '';
                         if (!logs || logs.length === 0) {
-                            this.elements.logContainer.innerHTML = '<p class="text-center text-gray-500">You haven''t logged any meals yet.</p>';
+                            this.elements.logContainer.innerHTML = "<p class='text-center text-gray-500'>You haven't logged any meals yet.</p>";
                             return;
                         }
                         logs.forEach(log => {
@@ -195,12 +195,12 @@
                             const logEntry = document.createElement('div');
                             logEntry.className = 'bg-white p-4 rounded-lg shadow-sm';
                             
-                            let logHTML = '<p class="text-gray-800">' +
-                                          '<span class="font-bold">' + formattedDate + ':</span> You ate ' +
-                                          '<a href="#" data-recipe-id="' + log.recipe_id + '" class="text-blue-600 font-semibold hover:underline">' + log.recipe_name + '</a>.' +
-                                          '</p>';
+                            let logHTML = `<p class="text-gray-800">
+                                          <span class="font-bold">${formattedDate}:</span> You ate 
+                                          <a href="#" data-recipe-id="${log.recipe_id}" class="text-blue-600 font-semibold hover:underline">${log.recipe_name}</a>.
+                                          </p>`;
                             if (log.notes) {
-                                logHTML += '<p class="text-sm text-gray-500 mt-1 pl-4"><em>Note: ' + log.notes + '</em></p>';
+                                logHTML += `<p class="text-sm text-gray-500 mt-1 pl-4"><em>Note: ${log.notes}</em></p>`;
                             }
                             logEntry.innerHTML = logHTML;
 
@@ -231,7 +231,7 @@
 
                 renderResults(results) {
                     this.elements.resultsContainer.innerHTML = '';
-                    this.elements.resultsHeader.textContent = 'Found ' + (results?.length || 0) + ' recipe(s).';
+                    this.elements.resultsHeader.textContent = `Found ${results?.length || 0} recipe(s).`;
                     if (!results || results.length === 0) {
                         this.elements.resultsContainer.innerHTML = '<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-sm"><p>Try a different search term.</p></div>';
                         return;
@@ -239,7 +239,7 @@
                     results.forEach(recipe => {
                         const card = document.createElement('div');
                         card.className = 'bg-white p-5 rounded-xl shadow-md flex justify-between items-center cursor-pointer hover:shadow-lg hover:scale-105 transition-transform duration-200';
-                        card.innerHTML = '<div><span class="text-sm font-semibold text-blue-600">Recipe #' + recipe.id + '</span><h3 class="text-xl font-bold text-gray-800">' + recipe.name + '</h3></div><button class="bg-gray-800 text-white font-semibold px-4 py-2 rounded-lg hover:bg-black transition">View</button>';
+                        card.innerHTML = `<div><span class="text-sm font-semibold text-blue-600">Recipe #${recipe.id}</span><h3 class="text-xl font-bold text-gray-800">${recipe.name}</h3></div><button class="bg-gray-800 text-white font-semibold px-4 py-2 rounded-lg hover:bg-black transition">View</button>`;
                         card.addEventListener('click', () => this.showRecipeDetails(recipe.id));
                         this.elements.resultsContainer.appendChild(card);
                     });
@@ -253,10 +253,10 @@
                 async showRecipeDetails(recipeId) {
                     this.currentRecipeId = recipeId;
                     try {
-                        const recipe = await this.apiRequest('/api/recipes/' + recipeId);
+                        const recipe = await this.apiRequest(`/api/recipes/${recipeId}`);
                         this.elements.modalRecipeName.textContent = recipe.name;
-                        this.elements.modalIngredients.innerHTML = recipe.ingredients.map(ing => '<li><span class="font-semibold">' + ing.quantity + ' ' + ing.name + '</span> ' + (ing.notes ? '<em>(' + ing.notes + ')</em>' : '') + '</li>').join('');
-                        this.elements.modalInstructions.innerHTML = recipe.instructions.map(step => '<li>' + step + '</li>').join('');
+                        this.elements.modalIngredients.innerHTML = recipe.ingredients.map(ing => `<li><span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}</li>`).join('');
+                        this.elements.modalInstructions.innerHTML = recipe.instructions.map(step => `<li>${step}</li>`).join('');
                         await this.fetchAndRenderModalLogHistory(recipeId);
                         this.elements.recipeModal.classList.remove('hidden');
                         document.body.style.overflow = 'hidden';
@@ -265,13 +265,13 @@
 
                 async fetchAndRenderModalLogHistory(recipeId) {
                     try {
-                        const logs = await this.apiRequest('/api/recipes/' + recipeId + '/log');
+                        const logs = await this.apiRequest(`/api/recipes/${recipeId}/log`);
                         this.elements.modalLogHistory.innerHTML = (!logs || logs.length === 0)
-                            ? '<li>You haven''t logged this meal yet.</li>'
+                            ? "<li>You haven't logged this meal yet.</li>"
                             : logs.map(log => {
                                 const date = new Date(log.eaten_date + 'T00:00:00');
                                 const formattedDate = date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-                                return '<li>' + formattedDate + '</li>';
+                                return `<li>${formattedDate}</li>`;
                             }).join('');
                     } catch (e) {
                         this.elements.modalLogHistory.innerHTML = '<li>Could not load history.</li>';
