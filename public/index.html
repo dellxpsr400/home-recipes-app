@@ -143,18 +143,59 @@
 
             const loader = document.getElementById('loader');
             const showLoader = (show) => loader.classList.toggle('hidden', !show);
-
-            // --- API Helper ---
-            const api = {
-                get: (endpoint) => fetch(endpoint).then(res => res.ok ? res.json() : Promise.reject(res)),
-                post: (endpoint, body) => fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                }).then(res => res.ok ? res.json() : Promise.reject(res))
+            
+            // --- Core App Logic ---
+            
+            const initializeApp = () => {
+                setupEventListeners();
+                fetchUserInfo();
             };
 
-            // --- Page/View Management ---
+            const setupEventListeners = () => {
+                showSearchBtn.addEventListener('click', () => switchView('search'));
+                showLogBtn.addEventListener('click', () => switchView('log'));
+                nameSearchBtn.addEventListener('click', searchByName);
+                ingredientSearchBtn.addEventListener('click', searchByIngredients);
+                clearSearchBtn.addEventListener('click', clearSearch);
+                nameSearchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchByName(); });
+                ingredientSearchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchByIngredients(); });
+                closeModalBtn.addEventListener('click', hideModal);
+                recipeModal.addEventListener('click', (e) => { if (e.target === recipeModal) hideModal(); });
+                saveLogBtn.addEventListener('click', saveLog);
+                logDateInput.valueAsDate = new Date(); // Set default date to today
+
+                document.body.addEventListener('click', (e) => {
+                    if (e.target && e.target.matches('#logContainer a[data-recipe-id]')) {
+                        e.preventDefault();
+                        const recipeId = e.target.getAttribute('data-recipe-id');
+                        showRecipeDetails(recipeId);
+                    }
+                });
+            };
+
+            // --- API Functions ---
+            const apiRequest = async (endpoint, options = {}) => {
+                showLoader(true);
+                try {
+                    const response = await fetch(endpoint, options);
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ error: 'An unknown error occurred' }));
+                        throw new Error(errorData.error);
+                    }
+                    if (response.status === 204 || response.headers.get("content-length") === "0") {
+                         return null; // Handle no-content responses for POST requests
+                    }
+                    return response.json();
+                } catch (error) {
+                    console.error(`API Error on ${endpoint}:`, error);
+                    throw error;
+                } finally {
+                    showLoader(false);
+                }
+            };
+            
+            // --- View and Data Functions ---
+
             const switchView = (viewToShow) => {
                 searchView.classList.toggle('view-hidden', viewToShow !== 'search');
                 logView.classList.toggle('view-hidden', viewToShow !== 'log');
@@ -163,13 +204,11 @@
                 if (viewToShow === 'log') fetchAndRenderFullLog();
             };
 
-            // --- Data Fetching and Rendering ---
             const fetchAndRenderFullLog = async () => {
-                showLoader(true);
                 try {
-                    const logs = await api.get('/api/log');
+                    const logs = await apiRequest('/api/log');
                     logContainer.innerHTML = '';
-                    if (logs.length === 0) {
+                    if (!logs || logs.length === 0) {
                         logContainer.innerHTML = '<p class="text-center text-gray-500">You haven''t logged any meals yet.</p>';
                         return;
                     }
@@ -188,37 +227,29 @@
                         logContainer.appendChild(logEntry);
                     });
                 } catch (error) {
-                    logContainer.innerHTML = '<p class="text-center text-red-500">Could not load your meal history.</p>';
-                } finally {
-                    showLoader(false);
+                    logContainer.innerHTML = `<p class="text-center text-red-500">Could not load your meal history. ${error.message}</p>`;
                 }
             };
             
             const searchByName = async () => {
                 const query = nameSearchInput.value.trim();
                 if (!query) return;
-                showLoader(true);
                 try {
-                    const results = await api.get(`/api/recipes/search/name?q=${encodeURIComponent(query)}`);
+                    const results = await apiRequest(`/api/recipes/search/name?q=${encodeURIComponent(query)}`);
                     renderResults(results);
                 } catch (error) {
                     renderError('Could not fetch recipes.');
-                } finally {
-                    showLoader(false);
                 }
             };
 
             const searchByIngredients = async () => {
                 const query = ingredientSearchInput.value.trim();
                 if (!query) return;
-                showLoader(true);
                 try {
-                    const results = await api.get(`/api/recipes/search/ingredient?q=${encodeURIComponent(query)}`);
+                    const results = await apiRequest(`/api/recipes/search/ingredient?q=${encodeURIComponent(query)}`);
                     renderResults(results);
                 } catch (error) {
                     renderError('Could not fetch recipes.');
-                } finally {
-                    showLoader(false);
                 }
             };
 
@@ -251,14 +282,11 @@
                 resultsContainer.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-sm" role="alert"><p>${message}</p></div>`;
             };
 
-            // --- Modal Functions ---
             const showRecipeDetails = async (recipeId) => {
                 currentRecipeId = recipeId;
-                showLoader(true);
                 try {
-                    const recipe = await api.get(`/api/recipes/${recipeId}`);
+                    const recipe = await apiRequest(`/api/recipes/${recipeId}`);
                     modalRecipeName.textContent = recipe.name;
-                    // CORRECTED: Added the missing closing backtick ` and `</li>` tag.
                     modalIngredients.innerHTML = recipe.ingredients.map(ing => `<li><span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}</li>`).join('');
                     modalInstructions.innerHTML = recipe.instructions.map(step => `<li>${step}</li>`).join('');
                     
@@ -268,16 +296,14 @@
                     document.body.style.overflow = 'hidden';
                 } catch (error) {
                     alert('Could not load recipe details.');
-                } finally {
-                    showLoader(false);
                 }
             };
             
             const fetchAndRenderModalLogHistory = async (recipeId) => {
                 try {
-                    const logs = await api.get(`/api/recipes/${recipeId}/log`);
+                    const logs = await apiRequest(`/api/recipes/${recipeId}/log`);
                     modalLogHistory.innerHTML = '';
-                    if (logs.length === 0) {
+                    if (!logs || logs.length === 0) {
                         modalLogHistory.innerHTML = '<li>You haven''t logged this meal yet.</li>';
                     } else {
                         logs.forEach(log => {
@@ -303,51 +329,32 @@
 
                 logStatusMsg.textContent = 'Saving...';
                 try {
-                    await api.post('/api/log', { recipe_id: currentRecipeId, eaten_date, notes: '' });
+                    await apiRequest('/api/log', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ recipe_id: currentRecipeId, eaten_date, notes: '' })
+                    });
                     logStatusMsg.textContent = 'Saved successfully!';
-                    await fetchAndRenderModalLogHistory(currentRecipeId); // Refresh the history
+                    await fetchAndRenderModalLogHistory(currentRecipeId);
                     setTimeout(() => logStatusMsg.textContent = '', 2000);
                 } catch (error) {
                      logStatusMsg.textContent = 'Failed to save.';
                 }
             };
             
-            // --- User Info ---
             const fetchUserInfo = async () => {
                 try {
-                    // Cloudflare Access injects this path automatically
-                    const res = await fetch('/cdn-cgi/access/get-identity');
-                    if (res.ok) {
-                        const identity = await res.json();
+                    const identity = await apiRequest('/cdn-cgi/access/get-identity');
+                    if (identity && identity.email) {
                         userEmailDisplay.textContent = `Logged in as: ${identity.email}`;
                     }
                 } catch (e) {
-                    console.error('Could not fetch user identity.');
+                    console.error('Could not fetch user identity. This is normal during local development if not logged in.');
+                    userEmailDisplay.textContent = 'Could not verify user. Please log in.';
                 }
             };
-
-            // --- Event Listeners & Initializers ---
-            showSearchBtn.addEventListener('click', () => switchView('search'));
-            showLogBtn.addEventListener('click', () => switchView('log'));
-            nameSearchBtn.addEventListener('click', searchByName);
-            ingredientSearchBtn.addEventListener('click', searchByIngredients);
-            clearSearchBtn.addEventListener('click', clearSearch);
-            nameSearchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchByName(); });
-            ingredientSearchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchByIngredients(); });
-            closeModalBtn.addEventListener('click', hideModal);
-            recipeModal.addEventListener('click', (e) => { if (e.target === recipeModal) hideModal(); });
-            saveLogBtn.addEventListener('click', saveLog);
-            logDateInput.valueAsDate = new Date(); // Set default date to today
-
-            document.body.addEventListener('click', (e) => {
-                if (e.target && e.target.matches('#logContainer a[data-recipe-id]')) {
-                    e.preventDefault();
-                    const recipeId = e.target.getAttribute('data-recipe-id');
-                    showRecipeDetails(recipeId);
-                }
-            });
-
-            fetchUserInfo();
+            
+            initializeApp();
         });
     </script>
 </body>
