@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Recipes</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Use the Inter font family */
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+        /* Custom scrollbar for better aesthetics */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        /* Style for the modal backdrop */
+        #recipeModal {
+            transition: opacity 0.3s ease;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- Main container -->
+    <div class="container mx-auto p-4 md:p-6 max-w-4xl">
+
+        <!-- Header Section -->
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">My Home Recipes</h1>
+            <p id="totalRecipesCounter" class="text-gray-600 mt-2 text-sm md:text-base">Loading total recipes...</p>
+        </header>
+
+        <!-- Search Sections -->
+        <main>
+            <!-- Search by Recipe Name -->
+            <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-4">
+                <h2 class="text-xl md:text-2xl font-semibold mb-3">Search by Recipe Name</h2>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" id="nameSearchInput" placeholder="e.g., 'Cashew Pie'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
+                    <button id="nameSearchBtn" class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow">Search</button>
+                </div>
+            </div>
+
+            <!-- Search by Ingredients -->
+            <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-6">
+                <h2 class="text-xl md:text-2xl font-semibold mb-3">Search by Ingredients</h2>
+                <p class="text-gray-500 mb-3 text-sm">Enter one or more ingredients, separated by commas.</p>
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <input type="text" id="ingredientSearchInput" placeholder="e.g., 'tomatoes, garlic'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition">
+                    <button id="ingredientSearchBtn" class="bg-green-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-green-700 transition shadow">Search</button>
+                </div>
+            </div>
+            
+            <!-- Results Header and Clear Button -->
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="resultsHeader" class="text-lg font-semibold text-gray-700"></h3>
+                <button id="clearSearchBtn" class="bg-gray-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-gray-600 transition shadow-sm text-sm">Clear Search</button>
+            </div>
+            
+            <div id="resultsContainer" class="space-y-4">
+                <!-- Search results will be dynamically inserted here -->
+            </div>
+        </main>
+
+    </div>
+
+    <!-- Recipe Details Modal -->
+    <div id="recipeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
+        <div id="modalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                <h2 id="modalRecipeName" class="text-3xl font-bold">Recipe Name</h2>
+                <button id="closeModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
+            </div>
+            <div class="p-6 overflow-y-auto custom-scrollbar">
+                <div class="mb-6">
+                    <h3 class="text-2xl font-semibold mb-3">Ingredients</h3>
+                    <ul id="modalIngredients" class="list-disc list-inside space-y-2"></ul>
+                </div>
+                <div>
+                    <h3 class="text-2xl font-semibold mb-3">Instructions</h3>
+                    <ol id="modalInstructions" class="list-decimal list-inside space-y-3"></ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Element References ---
+            const nameSearchInput = document.getElementById('nameSearchInput');
+            const nameSearchBtn = document.getElementById('nameSearchBtn');
+            const ingredientSearchInput = document.getElementById('ingredientSearchInput');
+            const ingredientSearchBtn = document.getElementById('ingredientSearchBtn');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const resultsHeader = document.getElementById('resultsHeader');
+            const clearSearchBtn = document.getElementById('clearSearchBtn');
+            const totalRecipesCounter = document.getElementById('totalRecipesCounter');
+
+            // Modal elements
+            const recipeModal = document.getElementById('recipeModal');
+            const closeModalBtn = document.getElementById('closeModalBtn');
+            const modalRecipeName = document.getElementById('modalRecipeName');
+            const modalIngredients = document.getElementById('modalIngredients');
+            const modalInstructions = document.getElementById('modalInstructions');
+
+            // --- Initial Data Fetch ---
+            const fetchTotalCount = async () => {
+                try {
+                    const response = await fetch('/api/recipes/count');
+                    if (!response.ok) throw new Error('Failed to fetch count.');
+                    const data = await response.json();
+                    totalRecipesCounter.textContent = `Serving ${data.total} recipes from the family cookbook.`;
+                } catch (error) {
+                    console.error('Failed to fetch total recipe count:', error);
+                    totalRecipesCounter.textContent = 'Could not load recipe count.';
+                }
+            };
+
+            // --- Search Functions (API Calls) ---
+            const searchByName = async () => {
+                const query = nameSearchInput.value.trim();
+                if (!query) return;
+                try {
+                    const response = await fetch(`/api/recipes/search/name?q=${encodeURIComponent(query)}`);
+                    if (!response.ok) throw new Error('Network response was not ok.');
+                    const results = await response.json();
+                    renderResults(results);
+                } catch (error) {
+                    console.error('Failed to search by name:', error);
+                    renderError('Could not fetch recipes. Please try again later.');
+                }
+            };
+
+            const searchByIngredients = async () => {
+                const query = ingredientSearchInput.value.trim();
+                if (!query) return;
+                try {
+                    const response = await fetch(`/api/recipes/search/ingredient?q=${encodeURIComponent(query)}`);
+                    if (!response.ok) throw new Error('Network response was not ok.');
+                    const results = await response.json();
+                    renderResults(results);
+                } catch (error) {
+                    console.error('Failed to search by ingredients:', error);
+                    renderError('Could not fetch recipes. Please try again later.');
+                }
+            };
+
+            const clearSearch = () => {
+                nameSearchInput.value = '';
+                ingredientSearchInput.value = '';
+                resultsContainer.innerHTML = '';
+                resultsHeader.textContent = '';
+            };
+
+            // --- Rendering Functions ---
+            const renderResults = (results) => {
+                resultsContainer.innerHTML = ''; 
+
+                if (!results || results.length === 0) {
+                    resultsHeader.textContent = 'Found 0 recipes.';
+                    resultsContainer.innerHTML = `<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-sm" role="alert">
+                                                    <p>Try a different search term.</p>
+                                                  </div>`;
+                    return;
+                }
+                
+                resultsHeader.textContent = `Found ${results.length} recipe(s).`;
+
+                results.forEach(recipe => {
+                    const resultCard = document.createElement('div');
+                    resultCard.className = 'bg-white p-5 rounded-xl shadow-md flex justify-between items-center cursor-pointer hover:shadow-lg hover:scale-105 transition-transform duration-200';
+                    resultCard.innerHTML = `
+                        <div>
+                            <span class="text-sm font-semibold text-blue-600">Recipe #${recipe.id}</span>
+                            <h3 class="text-xl font-bold text-gray-800">${recipe.name}</h3>
+                        </div>
+                        <button class="bg-gray-800 text-white font-semibold px-4 py-2 rounded-lg hover:bg-black transition">View</button>
+                    `;
+                    resultCard.addEventListener('click', () => showRecipeDetails(recipe.id));
+                    resultsContainer.appendChild(resultCard);
+                });
+            };
+            
+            const renderError = (message) => {
+                resultsHeader.textContent = 'Search Error';
+                resultsContainer.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-sm" role="alert">
+                                                    <p>${message}</p>
+                                                </div>`;
+            };
+
+            // --- Modal Functions ---
+            const showRecipeDetails = async (recipeId) => {
+                try {
+                    const response = await fetch(`/api/recipes/${recipeId}`);
+                    if (!response.ok) throw new Error('Failed to fetch recipe details.');
+                    const recipe = await response.json();
+                    modalRecipeName.textContent = recipe.name;
+                    modalIngredients.innerHTML = recipe.ingredients.map(ing => `<li><span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}`).join('');
+                    modalInstructions.innerHTML = recipe.instructions.map(step => `<li>${step}</li>`).join('');
+                    recipeModal.classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                } catch (error) {
+                    console.error('Failed to show recipe details:', error);
+                    alert('Could not load recipe details. Please try again.');
+                }
+            };
+
+            const hideModal = () => {
+                recipeModal.classList.add('hidden');
+                document.body.style.overflow = '';
+            };
+
+            // --- Event Listeners & Initializers ---
+            nameSearchBtn.addEventListener('click', searchByName);
+            ingredientSearchBtn.addEventListener('click', searchByIngredients);
+            clearSearchBtn.addEventListener('click', clearSearch);
+            nameSearchInput.addEventListener('keyup', (event) => { if (event.key === 'Enter') searchByName(); });
+            ingredientSearchInput.addEventListener('keyup', (event) => { if (event.key === 'Enter') searchByIngredients(); });
+            closeModalBtn.addEventListener('click', hideModal);
+            recipeModal.addEventListener('click', (event) => { if (event.target === recipeModal) hideModal(); });
+
+            fetchTotalCount(); // Fetch the total count when the page loads.
+        });
+    </script>
+</body>
+</html>
