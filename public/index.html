@@ -104,7 +104,7 @@
     </div>
 
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', () => {
         try {
             const app = {
                 currentRecipeId: null,
@@ -129,19 +129,30 @@
                 },
 
                 setupEventListeners() {
-                    this.elements.showSearchBtn.addEventListener('click', () => this.switchView('search'));
-                    this.elements.showLogBtn.addEventListener('click', () => this.switchView('log'));
-                    this.elements.nameSearchBtn.addEventListener('click', () => this.searchByName());
-                    this.elements.ingredientSearchBtn.addEventListener('click', () => this.searchByIngredients());
-                    this.elements.clearSearchBtn.addEventListener('click', () => this.clearSearch());
-                    this.elements.nameSearchInput.addEventListener('keyup', e => e.key === 'Enter' && this.searchByName());
-                    this.elements.ingredientSearchInput.addEventListener('keyup', e => e.key === 'Enter' && this.searchByIngredients());
-                    this.elements.closeModalBtn.addEventListener('click', () => this.hideModal());
-                    this.elements.recipeModal.addEventListener('click', e => {
-                        if (e.target === this.elements.recipeModal) this.hideModal();
-                    });
-                    this.elements.saveLogBtn.addEventListener('click', () => this.saveLog());
-                    this.elements.logDateInput.valueAsDate = new Date();
+                    const addListener = (id, event, handler) => {
+                        const element = this.elements[id];
+                        if (element) {
+                            element.addEventListener(event, handler);
+                        } else {
+                            console.error(`Error setting up listener: Element with ID '${id}' not found.`);
+                        }
+                    };
+
+                    addListener('showSearchBtn', 'click', () => this.switchView('search'));
+                    addListener('showLogBtn', 'click', () => this.switchView('log'));
+                    addListener('nameSearchBtn', 'click', () => this.searchByName());
+                    addListener('ingredientSearchBtn', 'click', () => this.searchByIngredients());
+                    addListener('clearSearchBtn', 'click', () => this.clearSearch());
+                    addListener('nameSearchInput', 'keyup', e => { if (e.key === 'Enter') this.searchByName(); });
+                    addListener('ingredientSearchInput', 'keyup', e => { if (e.key === 'Enter') this.searchByIngredients(); });
+                    addListener('closeModalBtn', 'click', () => this.hideModal());
+                    addListener('recipeModal', 'click', e => { if (e.target === this.elements.recipeModal) this.hideModal(); });
+                    addListener('saveLogBtn', 'click', () => this.saveLog());
+                    
+                    if (this.elements.logDateInput) {
+                        this.elements.logDateInput.valueAsDate = new Date();
+                    }
+
                     document.body.addEventListener('click', e => {
                         const link = e.target.closest('#logContainer a[data-recipe-id]');
                         if (link) {
@@ -194,16 +205,7 @@
                             const formattedDate = date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
                             const logEntry = document.createElement('div');
                             logEntry.className = 'bg-white p-4 rounded-lg shadow-sm';
-                            
-                            let logHTML = `<p class="text-gray-800">
-                                          <span class="font-bold">${formattedDate}:</span> You ate 
-                                          <a href="#" data-recipe-id="${log.recipe_id}" class="text-blue-600 font-semibold hover:underline">${log.recipe_name}</a>.
-                                          </p>`;
-                            if (log.notes) {
-                                logHTML += `<p class="text-sm text-gray-500 mt-1 pl-4"><em>Note: ${log.notes}</em></p>`;
-                            }
-                            logEntry.innerHTML = logHTML;
-
+                            logEntry.innerHTML = `<p class="text-gray-800"><span class="font-bold">${formattedDate}:</span> You ate <a href="#" data-recipe-id="${log.recipe_id}" class="text-blue-600 font-semibold hover:underline">${log.recipe_name}</a>.</p>${log.notes ? `<p class="text-sm text-gray-500 mt-1 pl-4"><em>Note: ${log.notes}</em></p>` : ''}`;
                             this.elements.logContainer.appendChild(logEntry);
                         });
                     } catch (error) {
