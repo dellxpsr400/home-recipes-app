@@ -104,12 +104,11 @@
     </div>
 
     <script>
+    try {
         const app = {
-            // --- STATE ---
             currentRecipeId: null,
             elements: {},
 
-            // --- INITIALIZATION ---
             init() {
                 this.cacheDOMElements();
                 this.setupEventListeners();
@@ -117,14 +116,16 @@
             },
 
             cacheDOMElements() {
-                const elementIds = [
+                const ids = [
                     'nameSearchInput', 'nameSearchBtn', 'ingredientSearchInput', 'ingredientSearchBtn', 'resultsContainer',
                     'resultsHeader', 'clearSearchBtn', 'user-email', 'showSearchBtn', 'showLogBtn', 'search-view',
                     'log-view', 'logContainer', 'recipeModal', 'closeModalBtn', 'modalRecipeName', 'modalIngredients',
-                    'modalInstructions', 'modal-log-history', 'log-date-input', 'save-log-btn', 'log-status-msg', 'loader'
+                    'modalInstructions', 'modal-log-history', 'log-date-input', 'save-log-btn', 'log-status-msg', 'loader', 'modalContent'
                 ];
-                elementIds.forEach(id => {
-                    this.elements[id] = document.getElementById(id);
+                ids.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (!el) console.warn(`Element with ID '${id}' not found.`);
+                    this.elements[id] = el;
                 });
             },
 
@@ -134,70 +135,45 @@
                 this.elements.nameSearchBtn.addEventListener('click', () => this.searchByName());
                 this.elements.ingredientSearchBtn.addEventListener('click', () => this.searchByIngredients());
                 this.elements.clearSearchBtn.addEventListener('click', () => this.clearSearch());
-                
-                this.elements.nameSearchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') this.searchByName(); });
-                this.elements.ingredientSearchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') this.searchByIngredients(); });
-                
+                this.elements.nameSearchInput.addEventListener('keyup', e => e.key === 'Enter' && this.searchByName());
+                this.elements.ingredientSearchInput.addEventListener('keyup', e => e.key === 'Enter' && this.searchByIngredients());
                 this.elements.closeModalBtn.addEventListener('click', () => this.hideModal());
-                this.elements.recipeModal.addEventListener('click', (e) => { if (e.target === this.elements.recipeModal) this.hideModal(); });
+                this.elements.recipeModal.addEventListener('click', e => e.target === this.elements.recipeModal && this.hideModal());
                 this.elements.saveLogBtn.addEventListener('click', () => this.saveLog());
-                
                 this.elements.logDateInput.valueAsDate = new Date();
-
-                document.body.addEventListener('click', (e) => {
-                    if (e.target && e.target.matches('#logContainer a[data-recipe-id]')) {
+                document.body.addEventListener('click', e => {
+                    if (e.target && e.target.closest('#logContainer a[data-recipe-id]')) {
                         e.preventDefault();
-                        const recipeId = e.target.getAttribute('data-recipe-id');
-                        this.showRecipeDetails(recipeId);
+                        this.showRecipeDetails(e.target.closest('a').dataset.recipeId);
                     }
                 });
             },
 
-            // --- API & DATA HANDLING ---
             async apiRequest(endpoint, options = {}) {
                 this.showLoader(true);
                 try {
                     const response = await fetch(endpoint, options);
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`API Error: ${response.status} ${errorText}`);
-                    }
+                    if (!response.ok) throw new Error(`API returned ${response.status}`);
                     if (response.headers.get("content-type")?.includes("application/json")) {
                         return response.json();
                     }
                     return null;
                 } catch (error) {
-                    console.error(`Failed to fetch ${endpoint}`, error);
+                    console.error(`API request to ${endpoint} failed:`, error);
                     throw error;
                 } finally {
                     this.showLoader(false);
                 }
             },
 
-            async fetchUserInfo() {
-                try {
-                    const identity = await this.apiRequest('/cdn-cgi/access/get-identity');
-                    if (identity && identity.email) {
-                        this.elements.userEmailDisplay.textContent = `Logged in as: ${identity.email}`;
-                    } else {
-                        this.elements.userEmailDisplay.textContent = 'Not logged in.';
-                    }
-                } catch (e) {
-                     this.elements.userEmailDisplay.textContent = 'Could not get user identity.';
-                }
-            },
+            showLoader(show) { this.elements.loader.classList.toggle('hidden', !show); },
 
-            // --- UI & VIEW LOGIC ---
-            showLoader(show) {
-                this.elements.loader.classList.toggle('hidden', !show);
-            },
-            
-            switchView(viewToShow) {
-                this.elements.searchView.classList.toggle('view-hidden', viewToShow !== 'search');
-                this.elements.logView.classList.toggle('view-hidden', viewToShow !== 'log');
-                this.elements.showSearchBtn.disabled = viewToShow === 'search';
-                this.elements.showLogBtn.disabled = viewToShow === 'log';
-                if (viewToShow === 'log') this.fetchAndRenderFullLog();
+            switchView(view) {
+                this.elements.searchView.classList.toggle('view-hidden', view !== 'search');
+                this.elements.logView.classList.toggle('view-hidden', view !== 'log');
+                this.elements.showSearchBtn.disabled = view === 'search';
+                this.elements.showLogBtn.disabled = view === 'log';
+                if (view === 'log') this.fetchAndRenderFullLog();
             },
 
             async fetchAndRenderFullLog() {
@@ -218,35 +194,22 @@
                                 <span class="font-bold">${formattedDate}:</span> You ate 
                                 <a href="#" data-recipe-id="${log.recipe_id}" class="text-blue-600 font-semibold hover:underline">${log.recipe_name}</a>.
                             </p>
-                            ${log.notes ? `<p class="text-sm text-gray-500 mt-1 pl-4"><em>Note: ${log.notes}</em></p>` : ''}
-                        `;
+                            ${log.notes ? `<p class="text-sm text-gray-500 mt-1 pl-4"><em>Note: ${log.notes}</em></p>` : ''}`;
                         this.elements.logContainer.appendChild(logEntry);
                     });
                 } catch (error) {
-                    this.elements.logContainer.innerHTML = `<p class="text-center text-red-500">Could not load your meal history.</p>`;
-                }
-            },
-            
-            async searchByName() {
-                const query = this.elements.nameSearchInput.value.trim();
-                if (!query) return;
-                try {
-                    const results = await this.apiRequest(`/api/recipes/search/name?q=${encodeURIComponent(query)}`);
-                    this.renderResults(results);
-                } catch (error) {
-                    this.renderError('Could not fetch recipes.');
+                    this.elements.logContainer.innerHTML = '<p class="text-center text-red-500">Could not load meal history.</p>';
                 }
             },
 
-            async searchByIngredients() {
-                const query = this.elements.ingredientSearchInput.value.trim();
-                if (!query) return;
+            async searchByName() { this.search('/api/recipes/search/name', this.elements.nameSearchInput.value); },
+            async searchByIngredients() { this.search('/api/recipes/search/ingredient', this.elements.ingredientSearchInput.value); },
+            async search(endpoint, query) {
+                if (!query.trim()) return;
                 try {
-                    const results = await this.apiRequest(`/api/recipes/search/ingredient?q=${encodeURIComponent(query)}`);
+                    const results = await this.apiRequest(`${endpoint}?q=${encodeURIComponent(query.trim())}`);
                     this.renderResults(results);
-                } catch (error) {
-                    this.renderError('Could not fetch recipes.');
-                }
+                } catch (error) { this.renderError(); }
             },
 
             clearSearch() {
@@ -258,24 +221,23 @@
 
             renderResults(results) {
                 this.elements.resultsContainer.innerHTML = '';
+                this.elements.resultsHeader.textContent = `Found ${results?.length || 0} recipe(s).`;
                 if (!results || results.length === 0) {
-                    this.elements.resultsHeader.textContent = 'Found 0 recipes.';
-                    this.elements.resultsContainer.innerHTML = `<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-sm" role="alert"><p>Try a different search term.</p></div>`;
+                    this.elements.resultsContainer.innerHTML = `<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-sm"><p>Try a different search term.</p></div>`;
                     return;
                 }
-                this.elements.resultsHeader.textContent = `Found ${results.length} recipe(s).`;
                 results.forEach(recipe => {
-                    const resultCard = document.createElement('div');
-                    resultCard.className = 'bg-white p-5 rounded-xl shadow-md flex justify-between items-center cursor-pointer hover:shadow-lg hover:scale-105 transition-transform duration-200';
-                    resultCard.innerHTML = `<div><span class="text-sm font-semibold text-blue-600">Recipe #${recipe.id}</span><h3 class="text-xl font-bold text-gray-800">${recipe.name}</h3></div><button class="bg-gray-800 text-white font-semibold px-4 py-2 rounded-lg hover:bg-black transition">View</button>`;
-                    resultCard.addEventListener('click', () => this.showRecipeDetails(recipe.id));
-                    this.elements.resultsContainer.appendChild(resultCard);
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-5 rounded-xl shadow-md flex justify-between items-center cursor-pointer hover:shadow-lg hover:scale-105 transition-transform duration-200';
+                    card.innerHTML = `<div><span class="text-sm font-semibold text-blue-600">Recipe #${recipe.id}</span><h3 class="text-xl font-bold text-gray-800">${recipe.name}</h3></div><button class="bg-gray-800 text-white font-semibold px-4 py-2 rounded-lg hover:bg-black transition">View</button>`;
+                    card.addEventListener('click', () => this.showRecipeDetails(recipe.id));
+                    this.elements.resultsContainer.appendChild(card);
                 });
             },
 
-            renderError(message) {
+            renderError() {
                 this.elements.resultsHeader.textContent = 'Search Error';
-                this.elements.resultsContainer.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-sm" role="alert"><p>${message}</p></div>`;
+                this.elements.resultsContainer.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-sm"><p>Could not fetch recipes. Please try again later.</p></div>`;
             },
 
             async showRecipeDetails(recipeId) {
@@ -285,31 +247,24 @@
                     this.elements.modalRecipeName.textContent = recipe.name;
                     this.elements.modalIngredients.innerHTML = recipe.ingredients.map(ing => `<li><span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}</li>`).join('');
                     this.elements.modalInstructions.innerHTML = recipe.instructions.map(step => `<li>${step}</li>`).join('');
-                    
                     await this.fetchAndRenderModalLogHistory(recipeId);
-
                     this.elements.recipeModal.classList.remove('hidden');
                     document.body.style.overflow = 'hidden';
-                } catch (error) {
-                    alert('Could not load recipe details.');
-                }
+                } catch (error) { alert('Could not load recipe details.'); }
             },
-            
+
             async fetchAndRenderModalLogHistory(recipeId) {
                 try {
                     const logs = await this.apiRequest(`/api/recipes/${recipeId}/log`);
-                    this.elements.modalLogHistory.innerHTML = '';
-                    if (!logs || logs.length === 0) {
-                        this.elements.modalLogHistory.innerHTML = '<li>You haven''t logged this meal yet.</li>';
-                    } else {
-                        logs.forEach(log => {
-                             const date = new Date(log.eaten_date + 'T00:00:00');
-                             const formattedDate = date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-                             this.elements.modalLogHistory.innerHTML += `<li>${formattedDate}</li>`;
-                        });
-                    }
-                } catch(e){
-                     this.elements.modalLogHistory.innerHTML = '<li>Could not load history.</li>';
+                    this.elements.modalLogHistory.innerHTML = (!logs || logs.length === 0)
+                        ? '<li>You haven''t logged this meal yet.</li>'
+                        : logs.map(log => {
+                            const date = new Date(log.eaten_date + 'T00:00:00');
+                            const formattedDate = date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+                            return `<li>${formattedDate}</li>`;
+                        }).join('');
+                } catch (e) {
+                    this.elements.modalLogHistory.innerHTML = '<li>Could not load history.</li>';
                 }
             },
 
@@ -318,30 +273,32 @@
                 document.body.style.overflow = '';
                 this.currentRecipeId = null;
             },
-            
+
             async saveLog() {
                 const eaten_date = this.elements.logDateInput.value;
                 if (!eaten_date || !this.currentRecipeId) return;
-
                 this.elements.logStatusMsg.textContent = 'Saving...';
                 try {
-                    const options = {
+                    await this.apiRequest('/api/log', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ recipe_id: this.currentRecipeId, eaten_date, notes: '' })
-                    };
-                    await this.apiRequest('/api/log', options);
+                    });
                     this.elements.logStatusMsg.textContent = 'Saved successfully!';
                     await this.fetchAndRenderModalLogHistory(this.currentRecipeId);
-                    setTimeout(() => { this.elements.logStatusMsg.textContent = '' }, 2000);
+                    setTimeout(() => { this.elements.logStatusMsg.textContent = ''; }, 2000);
                 } catch (error) {
-                     this.elements.logStatusMsg.textContent = 'Failed to save.';
+                    this.elements.logStatusMsg.textContent = 'Failed to save.';
                 }
             }
         };
 
-        app.init();
-    });
+        document.addEventListener('DOMContentLoaded', () => app.init());
+        
+    } catch (e) {
+        console.error("A fatal error occurred on page load:", e);
+        alert("A fatal error occurred while loading the application. Please check the console for details.");
+    }
     </script>
 </body>
 </html>
