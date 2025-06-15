@@ -26,74 +26,74 @@
         <!-- Header Section -->
         <header class="text-center mb-6 border-b pb-4">
             <div class="flex justify-between items-center mb-2">
-                 <button id="showSearchBtn" class="text-blue-600 font-semibold hover:underline disabled:text-gray-400 disabled:no-underline" disabled>Recipe Search</button>
-                 <button id="showLogBtn" class="text-blue-600 font-semibold hover:underline disabled:text-gray-400 disabled:no-underline">Meal Log</button>
+                 <button id="show-search-btn" class="text-blue-600 font-semibold hover:underline disabled:text-gray-400 disabled:no-underline" disabled>Recipe Search</button>
+                 <button id="show-log-btn" class="text-blue-600 font-semibold hover:underline disabled:text-gray-400 disabled:no-underline">Meal Log</button>
             </div>
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900">My Home Recipes</h1>
-            <p id="userEmail" class="text-gray-500 text-sm mt-2 h-5"></p>
+            <p id="user-email" class="text-gray-500 text-sm mt-2 h-5"></p>
         </header>
 
         <!-- Search View -->
-        <div id="searchView">
+        <div id="search-view">
             <main>
                 <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-4">
                     <h2 class="text-xl md:text-2xl font-semibold mb-3">Search by Recipe Name</h2>
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="text" id="nameSearchInput" placeholder="e.g., 'Cashew Pie'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
-                        <button id="nameSearchBtn" class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow">Search</button>
+                        <input type="text" id="name-search-input" placeholder="e.g., 'Cashew Pie'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
+                        <button id="name-search-btn" class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow">Search</button>
                     </div>
                 </div>
                 <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-6">
                     <h2 class="text-xl md:text-2xl font-semibold mb-3">Search by Ingredients</h2>
                     <p class="text-gray-500 mb-3 text-sm">Enter one or more ingredients, separated by commas.</p>
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="text" id="ingredientSearchInput" placeholder="e.g., 'tomatoes, garlic'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition">
-                        <button id="ingredientSearchBtn" class="bg-green-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-green-700 transition shadow">Search</button>
+                        <input type="text" id="ingredient-search-input" placeholder="e.g., 'tomatoes, garlic'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition">
+                        <button id="ingredient-search-btn" class="bg-green-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-green-700 transition shadow">Search</button>
                     </div>
                 </div>
                 <div class="flex justify-between items-center mb-4">
-                    <h3 id="resultsHeader" class="text-lg font-semibold text-gray-700">&nbsp;</h3>
-                    <button id="clearSearchBtn" class="bg-gray-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-gray-600 transition shadow-sm text-sm">Clear Search</button>
+                    <h3 id="results-header" class="text-lg font-semibold text-gray-700">&nbsp;</h3>
+                    <button id="clear-search-btn" class="bg-gray-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-gray-600 transition shadow-sm text-sm">Clear Search</button>
                 </div>
-                <div id="resultsContainer" class="space-y-4"></div>
+                <div id="results-container" class="space-y-4"></div>
             </main>
         </div>
 
         <!-- Meal Log View -->
-        <div id="logView" class="view-hidden">
+        <div id="log-view" class="view-hidden">
              <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Your Meal History</h2>
-             <div id="logContainer" class="space-y-3"></div>
+             <div id="log-container" class="space-y-3"></div>
         </div>
 
     </div>
 
     <!-- Recipe Details Modal -->
-    <div id="recipeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
-        <div id="modalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div id="recipe-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
+        <div id="modal-content" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
             <div class="p-6 border-b border-gray-200 flex justify-between items-center">
-                <h2 id="modalRecipeName" class="text-2xl md:text-3xl font-bold">&nbsp;</h2>
-                <button id="closeModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
+                <h2 id="modal-recipe-name" class="text-2xl md:text-3xl font-bold">&nbsp;</h2>
+                <button id="close-modal-btn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
             </div>
-            <div id="modalBody" class="p-6 overflow-y-auto custom-scrollbar">
-                <div id="logMealSection" class="bg-blue-50 p-4 rounded-lg mb-6">
+            <div id="modal-body" class="p-6 overflow-y-auto custom-scrollbar">
+                <div id="log-meal-section" class="bg-blue-50 p-4 rounded-lg mb-6">
                     <h3 class="text-xl font-semibold mb-3">Log this Meal</h3>
                     <div class="flex flex-col sm:flex-row gap-3 items-center">
-                        <input type="date" id="logDateInput" class="p-2 border rounded-lg flex-grow w-full sm:w-auto">
-                        <button id="saveLogBtn" class="bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto">Save to Log</button>
+                        <input type="date" id="log-date-input" class="p-2 border rounded-lg flex-grow w-full sm:w-auto">
+                        <button id="save-log-btn" class="bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto">Save to Log</button>
                     </div>
-                    <p id="logStatusMsg" class="text-sm text-green-700 mt-2 h-4"></p>
+                    <p id="log-status-msg" class="text-sm text-green-700 mt-2 h-4"></p>
                 </div>
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold mb-3">Your History for this Recipe</h3>
-                    <ul id="modalLogHistory" class="list-disc list-inside space-y-1 text-gray-600"></ul>
+                    <ul id="modal-log-history" class="list-disc list-inside space-y-1 text-gray-600"></ul>
                 </div>
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold mb-3">Ingredients</h3>
-                    <ul id="modalIngredients" class="list-disc list-inside space-y-2"></ul>
+                    <ul id="modal-ingredients" class="list-disc list-inside space-y-2"></ul>
                 </div>
                 <div>
                     <h3 class="text-xl font-semibold mb-3">Instructions</h3>
-                    <ol id="modalInstructions" class="list-decimal list-inside space-y-3"></ol>
+                    <ol id="modal-instructions" class="list-decimal list-inside space-y-3"></ol>
                 </div>
             </div>
         </div>
@@ -105,238 +105,225 @@
 
     <script>
     document.addEventListener('DOMContentLoaded', () => {
-        try {
-            const app = {
-                currentRecipeId: null,
-                elements: {},
+        // --- State ---
+        let currentRecipeId = null;
 
-                init() {
-                    this.cacheDOMElements();
-                    this.setupEventListeners();
-                    this.fetchUserInfo();
-                },
+        // --- DOM Elements ---
+        const E = {
+            nameSearchInput: document.getElementById('name-search-input'),
+            nameSearchBtn: document.getElementById('name-search-btn'),
+            ingredientSearchInput: document.getElementById('ingredient-search-input'),
+            ingredientSearchBtn: document.getElementById('ingredient-search-btn'),
+            resultsContainer: document.getElementById('results-container'),
+            resultsHeader: document.getElementById('results-header'),
+            clearSearchBtn: document.getElementById('clear-search-btn'),
+            userEmail: document.getElementById('user-email'),
+            showSearchBtn: document.getElementById('show-search-btn'),
+            showLogBtn: document.getElementById('show-log-btn'),
+            searchView: document.getElementById('search-view'),
+            logView: document.getElementById('log-view'),
+            logContainer: document.getElementById('log-container'),
+            recipeModal: document.getElementById('recipe-modal'),
+            closeModalBtn: document.getElementById('close-modal-btn'),
+            modalRecipeName: document.getElementById('modal-recipe-name'),
+            modalIngredients: document.getElementById('modal-ingredients'),
+            modalInstructions: document.getElementById('modal-instructions'),
+            modalLogHistory: document.getElementById('modal-log-history'),
+            logDateInput: document.getElementById('log-date-input'),
+            saveLogBtn: document.getElementById('save-log-btn'),
+            logStatusMsg: document.getElementById('log-status-msg'),
+            loader: document.getElementById('loader')
+        };
+        
+        // --- Utility Functions ---
+        const showLoader = (show) => {
+            if (E.loader) E.loader.classList.toggle('hidden', !show);
+        };
 
-                cacheDOMElements() {
-                    const ids = [
-                        'nameSearchInput', 'nameSearchBtn', 'ingredientSearchInput', 'ingredientSearchBtn', 'resultsContainer',
-                        'resultsHeader', 'clearSearchBtn', 'userEmail', 'showSearchBtn', 'showLogBtn', 'searchView',
-                        'logView', 'logContainer', 'recipeModal', 'closeModalBtn', 'modalRecipeName', 'modalIngredients',
-                        'modalInstructions', 'modalLogHistory', 'logDateInput', 'saveLogBtn', 'logStatusMsg', 'loader'
-                    ];
-                    ids.forEach(id => {
-                        this.elements[id] = document.getElementById(id);
-                    });
-                },
-
-                setupEventListeners() {
-                    const addListener = (element, event, handler) => {
-                        if (element) {
-                            element.addEventListener(event, handler);
-                        }
-                    };
-
-                    addListener(this.elements.showSearchBtn, 'click', () => this.switchView('search'));
-                    addListener(this.elements.showLogBtn, 'click', () => this.switchView('log'));
-                    addListener(this.elements.nameSearchBtn, 'click', () => this.searchByName());
-                    addListener(this.elements.ingredientSearchBtn, 'click', () => this.searchByIngredients());
-                    addListener(this.elements.clearSearchBtn, 'click', () => this.clearSearch());
-                    addListener(this.elements.nameSearchInput, 'keyup', e => { if (e.key === 'Enter') this.searchByName(); });
-                    addListener(this.elements.ingredientSearchInput, 'keyup', e => { if (e.key === 'Enter') this.searchByIngredients(); });
-                    addListener(this.elements.closeModalBtn, 'click', () => this.hideModal());
-                    addListener(this.elements.recipeModal, 'click', e => { if (e.target === this.elements.recipeModal) this.hideModal(); });
-                    addListener(this.elements.saveLogBtn, 'click', () => this.saveLog());
-                    
-                    if (this.elements.logDateInput) {
-                        this.elements.logDateInput.valueAsDate = new Date();
-                    }
-
-                    document.body.addEventListener('click', e => {
-                        const link = e.target.closest('#logContainer a[data-recipe-id]');
-                        if (link) {
-                            e.preventDefault();
-                            this.showRecipeDetails(link.dataset.recipeId);
-                        }
-                    });
-                },
-
-                async apiRequest(endpoint, options = {}) {
-                    this.showLoader(true);
-                    try {
-                        const response = await fetch(endpoint, options);
-                        if (!response.ok) {
-                             const errorText = await response.text();
-                             throw new Error(`API Error: ${response.status} - ${errorText}`);
-                        }
-                        if (response.headers.get("content-type")?.includes("application/json")) {
-                            return response.json();
-                        }
-                        return null;
-                    } catch (error) {
-                        console.error(`API request to ${endpoint} failed:`, error);
-                        throw error;
-                    } finally {
-                        this.showLoader(false);
-                    }
-                },
-
-                showLoader(show) { if(this.elements.loader) this.elements.loader.classList.toggle('hidden', !show); },
-                
-                switchView(view) {
-                    this.elements.searchView.classList.toggle('view-hidden', view !== 'search');
-                    this.elements.logView.classList.toggle('view-hidden', view !== 'log');
-                    this.elements.showSearchBtn.disabled = view === 'search';
-                    this.elements.showLogBtn.disabled = view === 'log';
-                    if (view === 'log') this.fetchAndRenderFullLog();
-                },
-
-                async fetchAndRenderFullLog() {
-                    try {
-                        const logs = await this.apiRequest('/api/log');
-                        this.elements.logContainer.innerHTML = '';
-                        if (!logs || logs.length === 0) {
-                            this.elements.logContainer.innerHTML = "<p class='text-center text-gray-500'>You haven't logged any meals yet.</p>";
-                            return;
-                        }
-                        logs.forEach(log => {
-                            const date = new Date(log.eaten_date + 'T00:00:00');
-                            const formattedDate = date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-                            const logEntry = document.createElement('div');
-                            logEntry.className = 'bg-white p-4 rounded-lg shadow-sm';
-                            logEntry.innerHTML = `<p class="text-gray-800"><span class="font-bold">${formattedDate}:</span> You ate <a href="#" data-recipe-id="${log.recipe_id}" class="text-blue-600 font-semibold hover:underline">${log.recipe_name}</a>.</p>${log.notes ? `<p class="text-sm text-gray-500 mt-1 pl-4"><em>Note: ${log.notes}</em></p>` : ''}`;
-                            this.elements.logContainer.appendChild(logEntry);
-                        });
-                    } catch (error) {
-                        this.elements.logContainer.innerHTML = '<p class="text-center text-red-500">Could not load meal history.</p>';
-                    }
-                },
-
-                async searchByName() { this.search('/api/recipes/search/name', this.elements.nameSearchInput.value); },
-                async searchByIngredients() { this.search('/api/recipes/search/ingredient', this.elements.ingredientSearchInput.value); },
-                
-                async search(endpoint, query) {
-                    if (!query.trim()) return;
-                    try {
-                        const results = await this.apiRequest(`${endpoint}?q=${encodeURIComponent(query.trim())}`);
-                        this.renderResults(results);
-                    } catch (error) { this.renderError(); }
-                },
-
-                clearSearch() {
-                    this.elements.nameSearchInput.value = '';
-                    this.elements.ingredientSearchInput.value = '';
-                    this.elements.resultsContainer.innerHTML = '';
-                    this.elements.resultsHeader.textContent = '';
-                },
-                
-                // REWRITTEN to be more robust and include error logging
-                renderResults(results) {
-                    console.log("Attempting to render results:", results);
-
-                    if (!this.elements.resultsContainer || !this.elements.resultsHeader) {
-                        console.error("renderResults failed: resultsContainer or resultsHeader element not found.");
-                        return;
-                    }
-
-                    this.elements.resultsContainer.innerHTML = '';
-                    this.elements.resultsHeader.textContent = `Found ${results?.length || 0} recipe(s).`;
-                    
-                    if (!results || results.length === 0) {
-                        this.elements.resultsContainer.innerHTML = '<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-sm"><p>Try a different search term.</p></div>';
-                        return;
-                    }
-
-                    try {
-                        results.forEach(recipe => {
-                            if (!recipe || typeof recipe.id === 'undefined' || typeof recipe.name === 'undefined') {
-                                console.warn("Skipping invalid recipe object:", recipe);
-                                return; // Skip this iteration if the recipe object is malformed
-                            }
-                            const card = document.createElement('div');
-                            card.className = 'bg-white p-5 rounded-xl shadow-md flex justify-between items-center cursor-pointer hover:shadow-lg hover:scale-105 transition-transform duration-200';
-                            card.innerHTML = `<div><span class="text-sm font-semibold text-blue-600">Recipe #${recipe.id}</span><h3 class="text-xl font-bold text-gray-800">${recipe.name}</h3></div><button class="bg-gray-800 text-white font-semibold px-4 py-2 rounded-lg hover:bg-black transition">View</button>`;
-                            card.addEventListener('click', () => this.showRecipeDetails(recipe.id));
-                            this.elements.resultsContainer.appendChild(card);
-                        });
-                    } catch (error) {
-                        console.error("An error occurred inside the renderResults loop:", error);
-                        this.renderError();
-                    }
-                },
-
-                renderError() {
-                    this.elements.resultsHeader.textContent = 'Search Error';
-                    this.elements.resultsContainer.innerHTML = '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-sm"><p>Could not fetch recipes. Please try again later.</p></div>';
-                },
-
-                async showRecipeDetails(recipeId) {
-                    this.currentRecipeId = recipeId;
-                    try {
-                        const recipe = await this.apiRequest(`/api/recipes/${recipeId}`);
-                        this.elements.modalRecipeName.textContent = recipe.name;
-                        this.elements.modalIngredients.innerHTML = recipe.ingredients.map(ing => `<li><span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}</li>`).join('');
-                        this.elements.modalInstructions.innerHTML = recipe.instructions.map(step => `<li>${step}</li>`).join('');
-                        await this.fetchAndRenderModalLogHistory(recipeId);
-                        this.elements.recipeModal.classList.remove('hidden');
-                        document.body.style.overflow = 'hidden';
-                    } catch (error) { alert('Could not load recipe details.'); }
-                },
-
-                async fetchAndRenderModalLogHistory(recipeId) {
-                    try {
-                        const logs = await this.apiRequest(`/api/recipes/${recipeId}/log`);
-                        this.elements.modalLogHistory.innerHTML = (!logs || logs.length === 0)
-                            ? "<li>You haven't logged this meal yet.</li>"
-                            : logs.map(log => {
-                                const date = new Date(log.eaten_date + 'T00:00:00');
-                                const formattedDate = date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-                                return `<li>${formattedDate}</li>`;
-                            }).join('');
-                    } catch (e) {
-                        this.elements.modalLogHistory.innerHTML = '<li>Could not load history.</li>';
-                    }
-                },
-
-                hideModal() {
-                    this.elements.recipeModal.classList.add('hidden');
-                    document.body.style.overflow = '';
-                    this.currentRecipeId = null;
-                },
-
-                async saveLog() {
-                    const eaten_date = this.elements.logDateInput.value;
-                    if (!eaten_date || !this.currentRecipeId) return;
-                    this.elements.logStatusMsg.textContent = 'Saving...';
-                    try {
-                        await this.apiRequest('/api/log', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ recipe_id: this.currentRecipeId, eaten_date: eaten_date, notes: '' })
-                        });
-                        this.elements.logStatusMsg.textContent = 'Saved successfully!';
-                        await this.fetchAndRenderModalLogHistory(this.currentRecipeId);
-                        setTimeout(() => { this.elements.logStatusMsg.textContent = ''; }, 2000);
-                    } catch (error) {
-                        this.elements.logStatusMsg.textContent = 'Failed to save.';
-                    }
-                },
-
-                async fetchUserInfo() {
-                    try {
-                        const identity = await this.apiRequest('/cdn-cgi/access/get-identity');
-                        if (this.elements.userEmail && identity && identity.email) {
-                            this.elements.userEmail.textContent = 'Logged in as: ' + identity.email;
-                        }
-                    } catch (e) {
-                         if(this.elements.userEmail) this.elements.userEmail.textContent = 'Not logged in (this is normal for local testing).';
-                    }
+        const apiRequest = async (endpoint, options = {}) => {
+            showLoader(true);
+            try {
+                const response = await fetch(endpoint, options);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API Error: ${response.status} - ${errorText}`);
                 }
-            };
-            app.init();
-        } catch (e) {
-            console.error("A fatal error occurred on page load:", e);
-            document.body.innerHTML = '<div style="padding: 2rem; text-align: center; font-family: sans-serif;"><h1>Application Error</h1><p>A fatal error occurred. Please check the developer console for details.</p></div>';
-        }
-    });
-    </script>
+                if (response.headers.get("content-type")?.includes("application/json")) {
+                    return response.json();
+                }
+                return null;
+            } catch (error) {
+                console.error(`API request to ${endpoint} failed:`, error);
+                throw error;
+            } finally {
+                showLoader(false);
+            }
+        };
+
+        // --- View Switching ---
+        const switchView = (view) => {
+            E.searchView.classList.toggle('view-hidden', view !== 'search');
+            E.logView.classList.toggle('view-hidden', view !== 'log');
+            E.showSearchBtn.disabled = view === 'search';
+            E.showLogBtn.disabled = view === 'log';
+            if (view === 'log') fetchAndRenderFullLog();
+        };
+
+        // --- Search Logic ---
+        const search = async (endpoint, query) => {
+            if (!query.trim()) return;
+            try {
+                const results = await apiRequest(`${endpoint}?q=${encodeURIComponent(query.trim())}`);
+                renderResults(results);
+            } catch (error) { renderError(); }
+        };
+
+        const renderResults = (results) => {
+            E.resultsContainer.innerHTML = '';
+            E.resultsHeader.textContent = `Found ${results?.length || 0} recipe(s).`;
+            if (!results || results.length === 0) {
+                E.resultsContainer.innerHTML = '<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-sm"><p>Try a different search term.</p></div>';
+                return;
+            }
+            results.forEach(recipe => {
+                const card = document.createElement('div');
+                card.className = 'bg-white p-5 rounded-xl shadow-md flex justify-between items-center cursor-pointer hover:shadow-lg hover:scale-105 transition-transform duration-200';
+                card.innerHTML = `<div><span class="text-sm font-semibold text-blue-600">Recipe #${recipe.id}</span><h3 class="text-xl font-bold text-gray-800">${recipe.name}</h3></div><button class="bg-gray-800 text-white font-semibold px-4 py-2 rounded-lg hover:bg-black transition">View</button>`;
+                card.addEventListener('click', () => showRecipeDetails(recipe.id));
+                E.resultsContainer.appendChild(card);
+            });
+        };
+
+        const renderError = () => {
+            E.resultsHeader.textContent = 'Search Error';
+            E.resultsContainer.innerHTML = '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-sm"><p>Could not fetch recipes. Please try again later.</p></div>';
+        };
+
+        // --- Modal Logic ---
+        const showRecipeDetails = async (recipeId) => {
+            currentRecipeId = recipeId;
+            try {
+                const recipe = await apiRequest(`/api/recipes/${recipeId}`);
+                E.modalRecipeName.textContent = recipe.name;
+                E.modalIngredients.innerHTML = recipe.ingredients.map(ing => `<li><span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}</li>`).join('');
+                E.modalInstructions.innerHTML = recipe.instructions.map(step => `<li>${step}</li>`).join('');
+                await fetchAndRenderModalLogHistory(recipeId);
+                E.recipeModal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            } catch (error) { alert('Could not load recipe details.'); }
+        };
+
+        const hideModal = () => {
+            E.recipeModal.classList.add('hidden');
+            document.body.style.overflow = '';
+            currentRecipeId = null;
+        };
+
+        // --- Meal Log Logic ---
+        const fetchAndRenderFullLog = async () => {
+            try {
+                const logs = await apiRequest('/api/log');
+                E.logContainer.innerHTML = '';
+                if (!logs || logs.length === 0) {
+                    E.logContainer.innerHTML = "<p class='text-center text-gray-500'>You haven't logged any meals yet.</p>";
+                    return;
+                }
+                logs.forEach(log => {
+                    const date = new Date(log.eaten_date + 'T00:00:00');
+                    const formattedDate = date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+                    const logEntry = document.createElement('div');
+                    logEntry.className = 'bg-white p-4 rounded-lg shadow-sm';
+                    logEntry.innerHTML = `<p class="text-gray-800"><span class="font-bold">${formattedDate}:</span> You ate <a href="#" data-recipe-id="${log.recipe_id}" class="text-blue-600 font-semibold hover:underline">${log.recipe_name}</a>.</p>${log.notes ? `<p class="text-sm text-gray-500 mt-1 pl-4"><em>Note: ${log.notes}</em></p>` : ''}`;
+                    E.logContainer.appendChild(logEntry);
+                });
+            } catch (error) {
+                E.logContainer.innerHTML = '<p class="text-center text-red-500">Could not load meal history.</p>';
+            }
+        };
+
+        const fetchAndRenderModalLogHistory = async (recipeId) => {
+            try {
+                const logs = await apiRequest(`/api/recipes/${recipeId}/log`);
+                E.modalLogHistory.innerHTML = (!logs || logs.length === 0)
+                    ? "<li>You haven't logged this meal yet.</li>"
+                    : logs.map(log => {
+                        const date = new Date(log.eaten_date + 'T00:00:00');
+                        const formattedDate = date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
+                        return `<li>${formattedDate}</li>`;
+                    }).join('');
+            } catch (e) {
+                E.modalLogHistory.innerHTML = '<li>Could not load history.</li>';
+            }
+        };
+
+        const saveLog = async () => {
+            const eaten_date = E.logDateInput.value;
+            if (!eaten_date || !currentRecipeId) return;
+            E.logStatusMsg.textContent = 'Saving...';
+            try {
+                await apiRequest('/api/log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipe_id: currentRecipeId, eaten_date: eaten_date, notes: '' })
+                });
+                E.logStatusMsg.textContent = 'Saved successfully!';
+                await fetchAndRenderModalLogHistory(currentRecipeId);
+                setTimeout(() => { E.logStatusMsg.textContent = ''; }, 2000);
+            } catch (error) {
+                E.logStatusMsg.textContent = 'Failed to save.';
+            }
+        };
+
+        // --- Initialization ---
+        const fetchUserInfo = async () => {
+            try {
+                const identity = await apiRequest('/cdn-cgi/access/get-identity');
+                if (E.userEmail && identity && identity.email) {
+                    E.userEmail.textContent = 'Logged in as: ' + identity.email;
+                }
+            } catch (e) {
+                 if (E.userEmail) E.userEmail.textContent = 'Not logged in (this is normal for local testing).';
+            }
+        };
+
+        const setupEventListeners = () => {
+            E.showSearchBtn.addEventListener('click', () => switchView('search'));
+            E.showLogBtn.addEventListener('click', () => switchView('log'));
+            E.nameSearchBtn.addEventListener('click', () => search( '/api/recipes/search/name', E.nameSearchInput.value));
+            E.ingredientSearchBtn.addEventListener('click', () => search('/api/recipes/search/ingredient', E.ingredientSearchInput.value));
+            E.clearSearchBtn.addEventListener('click', () => {
+                E.nameSearchInput.value = '';
+                E.ingredientSearchInput.value = '';
+                E.resultsContainer.innerHTML = '';
+                E.resultsHeader.textContent = '';
+            });
+            E.nameSearchInput.addEventListener('keyup', e => { if (e.key === 'Enter') search('/api/recipes/search/name', E.nameSearchInput.value); });
+            E.ingredientSearchInput.addEventListener('keyup', e => { if (e.key === 'Enter') search('/api/recipes/search/ingredient', E.ingredientSearchInput.value); });
+            E.closeModalBtn.addEventListener('click', () => hideModal());
+            E.recipeModal.addEventListener('click', e => { if (e.target === E.recipeModal) hideModal(); });
+            E.saveLogBtn.addEventListener('click', () => saveLog());
+            
+            if (E.logDateInput) {
+                E.logDateInput.valueAsDate = new Date();
+            }
+
+            document.body.addEventListener('click', e => {
+                const link = e.target.closest('#log-container a[data-recipe-id]');
+                if (link) {
+                    e.preventDefault();
+                    showRecipeDetails(link.dataset.recipeId);
+                }
+            });
+        };
+        
+        fetchUserInfo();
+        setupEventListeners();
+
+    } catch (e) {
+        console.error("A fatal error occurred on page load:", e);
+        document.body.innerHTML = '<div style="padding: 2rem; text-align: center; font-family: sans-serif;"><h1>Application Error</h1><p>A fatal error occurred. Please check the developer console for details.</p></div>';
+    }
+});
+</script>
 </body>
 </html>
