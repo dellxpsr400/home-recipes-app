@@ -116,38 +116,41 @@
                     this.fetchUserInfo();
                 },
 
+                // CORRECTED: This function now converts kebab-case IDs to camelCase properties
+                // to match how they are called in the rest of the code.
                 cacheDOMElements() {
+                    const toCamelCase = (str) => str.replace(/-([a-z])/g, g => g[1].toUpperCase());
                     const ids = [
-                        'nameSearchInput', 'nameSearchBtn', 'ingredientSearchInput', 'ingredientSearchBtn', 'resultsContainer',
-                        'resultsHeader', 'clearSearchBtn', 'user-email', 'showSearchBtn', 'showLogBtn', 'search-view',
-                        'log-view', 'logContainer', 'recipeModal', 'closeModalBtn', 'modalRecipeName', 'modalIngredients',
-                        'modalInstructions', 'modal-log-history', 'log-date-input', 'save-log-btn', 'log-status-msg', 'loader'
+                        'name-search-input', 'name-search-btn', 'ingredient-search-input', 'ingredient-search-btn', 
+                        'results-container', 'results-header', 'clear-search-btn', 'user-email', 'show-search-btn', 
+                        'show-log-btn', 'search-view', 'log-view', 'log-container', 'recipe-modal', 'close-modal-btn', 
+                        'modal-recipe-name', 'modal-ingredients', 'modal-instructions', 'modal-log-history', 
+                        'log-date-input', 'save-log-btn', 'log-status-msg', 'loader'
                     ];
                     ids.forEach(id => {
-                        this.elements[id] = document.getElementById(id);
+                        this.elements[toCamelCase(id)] = document.getElementById(id);
                     });
                 },
 
                 setupEventListeners() {
-                    const addListener = (id, event, handler) => {
-                        const element = this.elements[id];
+                    const addListener = (element, event, handler) => {
                         if (element) {
                             element.addEventListener(event, handler);
                         } else {
-                            console.error(`Error setting up listener: Element with ID '${id}' not found.`);
+                            // This check is now redundant because of the fix, but good for safety.
                         }
                     };
 
-                    addListener('showSearchBtn', 'click', () => this.switchView('search'));
-                    addListener('showLogBtn', 'click', () => this.switchView('log'));
-                    addListener('nameSearchBtn', 'click', () => this.searchByName());
-                    addListener('ingredientSearchBtn', 'click', () => this.searchByIngredients());
-                    addListener('clearSearchBtn', 'click', () => this.clearSearch());
-                    addListener('nameSearchInput', 'keyup', e => { if (e.key === 'Enter') this.searchByName(); });
-                    addListener('ingredientSearchInput', 'keyup', e => { if (e.key === 'Enter') this.searchByIngredients(); });
-                    addListener('closeModalBtn', 'click', () => this.hideModal());
-                    addListener('recipeModal', 'click', e => { if (e.target === this.elements.recipeModal) this.hideModal(); });
-                    addListener('saveLogBtn', 'click', () => this.saveLog());
+                    addListener(this.elements.showSearchBtn, 'click', () => this.switchView('search'));
+                    addListener(this.elements.showLogBtn, 'click', () => this.switchView('log'));
+                    addListener(this.elements.nameSearchBtn, 'click', () => this.searchByName());
+                    addListener(this.elements.ingredientSearchBtn, 'click', () => this.searchByIngredients());
+                    addListener(this.elements.clearSearchBtn, 'click', () => this.clearSearch());
+                    addListener(this.elements.nameSearchInput, 'keyup', e => { if (e.key === 'Enter') this.searchByName(); });
+                    addListener(this.elements.ingredientSearchInput, 'keyup', e => { if (e.key === 'Enter') this.searchByIngredients(); });
+                    addListener(this.elements.closeModalBtn, 'click', () => this.hideModal());
+                    addListener(this.elements.recipeModal, 'click', e => { if (e.target === this.elements.recipeModal) this.hideModal(); });
+                    addListener(this.elements.saveLogBtn, 'click', () => this.saveLog());
                     
                     if (this.elements.logDateInput) {
                         this.elements.logDateInput.valueAsDate = new Date();
@@ -182,7 +185,7 @@
                     }
                 },
 
-                showLoader(show) { this.elements.loader.classList.toggle('hidden', !show); },
+                showLoader(show) { if (this.elements.loader) this.elements.loader.classList.toggle('hidden', !show); },
                 
                 switchView(view) {
                     this.elements.searchView.classList.toggle('view-hidden', view !== 'search');
@@ -308,10 +311,10 @@
                     try {
                         const identity = await this.apiRequest('/cdn-cgi/access/get-identity');
                         if (identity && identity.email) {
-                            this.elements.userEmailDisplay.textContent = 'Logged in as: ' + identity.email;
+                            this.elements.userEmail.textContent = 'Logged in as: ' + identity.email;
                         }
                     } catch (e) {
-                         this.elements.userEmailDisplay.textContent = 'Not logged in (this is normal for local testing).';
+                         this.elements.userEmail.textContent = 'Not logged in (this is normal for local testing).';
                     }
                 }
             };
