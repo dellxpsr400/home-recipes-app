@@ -258,7 +258,8 @@
                 try {
                     const recipe = await api.get(`/api/recipes/${recipeId}`);
                     modalRecipeName.textContent = recipe.name;
-                    modalIngredients.innerHTML = recipe.ingredients.map(ing => `<li><span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}`).join('');
+                    // CORRECTED: Added the missing closing backtick ` and `</li>` tag.
+                    modalIngredients.innerHTML = recipe.ingredients.map(ing => `<li><span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}</li>`).join('');
                     modalInstructions.innerHTML = recipe.instructions.map(step => `<li>${step}</li>`).join('');
                     
                     await fetchAndRenderModalLogHistory(recipeId);
