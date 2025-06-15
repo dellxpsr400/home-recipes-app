@@ -36,7 +36,6 @@
         <!-- Search View -->
         <div id="search-view">
             <main>
-                <!-- Search by Recipe Name -->
                 <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-4">
                     <h2 class="text-xl md:text-2xl font-semibold mb-3">Search by Recipe Name</h2>
                     <div class="flex flex-col sm:flex-row gap-3">
@@ -44,7 +43,6 @@
                         <button id="nameSearchBtn" class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow">Search</button>
                     </div>
                 </div>
-                <!-- Search by Ingredients -->
                 <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-6">
                     <h2 class="text-xl md:text-2xl font-semibold mb-3">Search by Ingredients</h2>
                     <p class="text-gray-500 mb-3 text-sm">Enter one or more ingredients, separated by commas.</p>
@@ -53,7 +51,6 @@
                         <button id="ingredientSearchBtn" class="bg-green-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-green-700 transition shadow">Search</button>
                     </div>
                 </div>
-                <!-- Results Header and Clear Button -->
                 <div class="flex justify-between items-center mb-4">
                     <h3 id="resultsHeader" class="text-lg font-semibold text-gray-700"></h3>
                     <button id="clearSearchBtn" class="bg-gray-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-gray-600 transition shadow-sm text-sm">Clear Search</button>
@@ -78,7 +75,6 @@
                 <button id="closeModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
             </div>
             <div id="modal-body" class="p-6 overflow-y-auto custom-scrollbar">
-                <!-- Log a Meal Section -->
                 <div id="log-meal-section" class="bg-blue-50 p-4 rounded-lg mb-6">
                     <h3 class="text-xl font-semibold mb-3">Log this Meal</h3>
                     <div class="flex flex-col sm:flex-row gap-3 items-center">
@@ -87,7 +83,6 @@
                     </div>
                     <p id="log-status-msg" class="text-sm text-green-700 mt-2 h-4"></p>
                 </div>
-                <!-- Meal History Section -->
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold mb-3">Your History for this Recipe</h3>
                     <ul id="modal-log-history" class="list-disc list-inside space-y-1 text-gray-600"></ul>
@@ -104,124 +99,113 @@
         </div>
     </div>
     
-    <!-- Loader element -->
     <div id="loader" class="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center hidden z-50">
         <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // --- Global state
-            let currentRecipeId = null;
+        const app = {
+            // --- STATE ---
+            currentRecipeId: null,
+            elements: {},
 
-            // --- DOM Element References ---
-            const nameSearchInput = document.getElementById('nameSearchInput');
-            const nameSearchBtn = document.getElementById('nameSearchBtn');
-            const ingredientSearchInput = document.getElementById('ingredientSearchInput');
-            const ingredientSearchBtn = document.getElementById('ingredientSearchBtn');
-            const resultsContainer = document.getElementById('resultsContainer');
-            const resultsHeader = document.getElementById('resultsHeader');
-            const clearSearchBtn = document.getElementById('clearSearchBtn');
-            const userEmailDisplay = document.getElementById('user-email');
-            
-            const showSearchBtn = document.getElementById('showSearchBtn');
-            const showLogBtn = document.getElementById('showLogBtn');
-            const searchView = document.getElementById('search-view');
-            const logView = document.getElementById('log-view');
-            const logContainer = document.getElementById('logContainer');
+            // --- INITIALIZATION ---
+            init() {
+                this.cacheDOMElements();
+                this.setupEventListeners();
+                this.fetchUserInfo();
+            },
 
-            // Modal elements
-            const recipeModal = document.getElementById('recipeModal');
-            const closeModalBtn = document.getElementById('closeModalBtn');
-            const modalRecipeName = document.getElementById('modalRecipeName');
-            const modalIngredients = document.getElementById('modalIngredients');
-            const modalInstructions = document.getElementById('modalInstructions');
-            const modalLogHistory = document.getElementById('modal-log-history');
-            const logDateInput = document.getElementById('log-date-input');
-            const saveLogBtn = document.getElementById('save-log-btn');
-            const logStatusMsg = document.getElementById('log-status-msg');
+            cacheDOMElements() {
+                const elementIds = [
+                    'nameSearchInput', 'nameSearchBtn', 'ingredientSearchInput', 'ingredientSearchBtn', 'resultsContainer',
+                    'resultsHeader', 'clearSearchBtn', 'user-email', 'showSearchBtn', 'showLogBtn', 'search-view',
+                    'log-view', 'logContainer', 'recipeModal', 'closeModalBtn', 'modalRecipeName', 'modalIngredients',
+                    'modalInstructions', 'modal-log-history', 'log-date-input', 'save-log-btn', 'log-status-msg', 'loader'
+                ];
+                elementIds.forEach(id => {
+                    this.elements[id] = document.getElementById(id);
+                });
+            },
 
-            const loader = document.getElementById('loader');
-            const showLoader = (show) => loader.classList.toggle('hidden', !show);
-            
-            // --- Core App Logic ---
-            
-            const initializeApp = () => {
-                try {
-                    setupEventListeners();
-                    fetchUserInfo();
-                } catch (error) {
-                    console.error("Critical error during app initialization:", error);
-                    alert("A critical error occurred. The app might not be fully functional. Please check the console.");
-                }
-            };
+            setupEventListeners() {
+                this.elements.showSearchBtn.addEventListener('click', () => this.switchView('search'));
+                this.elements.showLogBtn.addEventListener('click', () => this.switchView('log'));
+                this.elements.nameSearchBtn.addEventListener('click', () => this.searchByName());
+                this.elements.ingredientSearchBtn.addEventListener('click', () => this.searchByIngredients());
+                this.elements.clearSearchBtn.addEventListener('click', () => this.clearSearch());
+                
+                this.elements.nameSearchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') this.searchByName(); });
+                this.elements.ingredientSearchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') this.searchByIngredients(); });
+                
+                this.elements.closeModalBtn.addEventListener('click', () => this.hideModal());
+                this.elements.recipeModal.addEventListener('click', (e) => { if (e.target === this.elements.recipeModal) this.hideModal(); });
+                this.elements.saveLogBtn.addEventListener('click', () => this.saveLog());
+                
+                this.elements.logDateInput.valueAsDate = new Date();
 
-            const setupEventListeners = () => {
-                try {
-                    showSearchBtn.addEventListener('click', () => switchView('search'));
-                    showLogBtn.addEventListener('click', () => switchView('log'));
-                    nameSearchBtn.addEventListener('click', searchByName);
-                    ingredientSearchBtn.addEventListener('click', searchByIngredients);
-                    clearSearchBtn.addEventListener('click', clearSearch);
-                    nameSearchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchByName(); });
-                    ingredientSearchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchByIngredients(); });
-                    closeModalBtn.addEventListener('click', hideModal);
-                    recipeModal.addEventListener('click', (e) => { if (e.target === recipeModal) hideModal(); });
-                    saveLogBtn.addEventListener('click', saveLog);
-                    
-                    logDateInput.valueAsDate = new Date(); // Set default date to today
+                document.body.addEventListener('click', (e) => {
+                    if (e.target && e.target.matches('#logContainer a[data-recipe-id]')) {
+                        e.preventDefault();
+                        const recipeId = e.target.getAttribute('data-recipe-id');
+                        this.showRecipeDetails(recipeId);
+                    }
+                });
+            },
 
-                    document.body.addEventListener('click', (e) => {
-                        if (e.target && e.target.matches('#logContainer a[data-recipe-id]')) {
-                            e.preventDefault();
-                            const recipeId = e.target.getAttribute('data-recipe-id');
-                            showRecipeDetails(recipeId);
-                        }
-                    });
-                } catch(error) {
-                    console.error("Error setting up event listeners:", error);
-                }
-            };
-
-            // --- API Functions ---
-            const apiRequest = async (endpoint, options = {}) => {
-                showLoader(true);
+            // --- API & DATA HANDLING ---
+            async apiRequest(endpoint, options = {}) {
+                this.showLoader(true);
                 try {
                     const response = await fetch(endpoint, options);
                     if (!response.ok) {
                         const errorText = await response.text();
-                        console.error(`API Error Response for ${endpoint}:`, errorText);
-                        throw new Error(`Request failed with status ${response.status}`);
+                        throw new Error(`API Error: ${response.status} ${errorText}`);
                     }
-                    const contentType = response.headers.get("content-type");
-                    if (contentType && contentType.indexOf("application/json") !== -1) {
+                    if (response.headers.get("content-type")?.includes("application/json")) {
                         return response.json();
                     }
-                    return null; // Handle non-JSON responses
+                    return null;
                 } catch (error) {
-                    console.error(`API Error on ${endpoint}:`, error);
+                    console.error(`Failed to fetch ${endpoint}`, error);
                     throw error;
                 } finally {
-                    showLoader(false);
+                    this.showLoader(false);
                 }
-            };
-            
-            // --- View and Data Functions ---
+            },
 
-            const switchView = (viewToShow) => {
-                searchView.classList.toggle('view-hidden', viewToShow !== 'search');
-                logView.classList.toggle('view-hidden', viewToShow !== 'log');
-                showSearchBtn.disabled = viewToShow === 'search';
-                showLogBtn.disabled = viewToShow === 'log';
-                if (viewToShow === 'log') fetchAndRenderFullLog();
-            };
-
-            const fetchAndRenderFullLog = async () => {
+            async fetchUserInfo() {
                 try {
-                    const logs = await apiRequest('/api/log');
-                    logContainer.innerHTML = '';
+                    const identity = await this.apiRequest('/cdn-cgi/access/get-identity');
+                    if (identity && identity.email) {
+                        this.elements.userEmailDisplay.textContent = `Logged in as: ${identity.email}`;
+                    } else {
+                        this.elements.userEmailDisplay.textContent = 'Not logged in.';
+                    }
+                } catch (e) {
+                     this.elements.userEmailDisplay.textContent = 'Could not get user identity.';
+                }
+            },
+
+            // --- UI & VIEW LOGIC ---
+            showLoader(show) {
+                this.elements.loader.classList.toggle('hidden', !show);
+            },
+            
+            switchView(viewToShow) {
+                this.elements.searchView.classList.toggle('view-hidden', viewToShow !== 'search');
+                this.elements.logView.classList.toggle('view-hidden', viewToShow !== 'log');
+                this.elements.showSearchBtn.disabled = viewToShow === 'search';
+                this.elements.showLogBtn.disabled = viewToShow === 'log';
+                if (viewToShow === 'log') this.fetchAndRenderFullLog();
+            },
+
+            async fetchAndRenderFullLog() {
+                try {
+                    const logs = await this.apiRequest('/api/log');
+                    this.elements.logContainer.innerHTML = '';
                     if (!logs || logs.length === 0) {
-                        logContainer.innerHTML = '<p class="text-center text-gray-500">You haven''t logged any meals yet.</p>';
+                        this.elements.logContainer.innerHTML = '<p class="text-center text-gray-500">You haven''t logged any meals yet.</p>';
                         return;
                     }
                     logs.forEach(log => {
@@ -236,139 +220,128 @@
                             </p>
                             ${log.notes ? `<p class="text-sm text-gray-500 mt-1 pl-4"><em>Note: ${log.notes}</em></p>` : ''}
                         `;
-                        logContainer.appendChild(logEntry);
+                        this.elements.logContainer.appendChild(logEntry);
                     });
                 } catch (error) {
-                    logContainer.innerHTML = `<p class="text-center text-red-500">Could not load your meal history.</p>`;
+                    this.elements.logContainer.innerHTML = `<p class="text-center text-red-500">Could not load your meal history.</p>`;
                 }
-            };
+            },
             
-            const searchByName = async () => {
-                const query = nameSearchInput.value.trim();
+            async searchByName() {
+                const query = this.elements.nameSearchInput.value.trim();
                 if (!query) return;
                 try {
-                    const results = await apiRequest(`/api/recipes/search/name?q=${encodeURIComponent(query)}`);
-                    renderResults(results);
+                    const results = await this.apiRequest(`/api/recipes/search/name?q=${encodeURIComponent(query)}`);
+                    this.renderResults(results);
                 } catch (error) {
-                    renderError('Could not fetch recipes.');
+                    this.renderError('Could not fetch recipes.');
                 }
-            };
+            },
 
-            const searchByIngredients = async () => {
-                const query = ingredientSearchInput.value.trim();
+            async searchByIngredients() {
+                const query = this.elements.ingredientSearchInput.value.trim();
                 if (!query) return;
                 try {
-                    const results = await apiRequest(`/api/recipes/search/ingredient?q=${encodeURIComponent(query)}`);
-                    renderResults(results);
+                    const results = await this.apiRequest(`/api/recipes/search/ingredient?q=${encodeURIComponent(query)}`);
+                    this.renderResults(results);
                 } catch (error) {
-                    renderError('Could not fetch recipes.');
+                    this.renderError('Could not fetch recipes.');
                 }
-            };
+            },
 
-            const clearSearch = () => {
-                nameSearchInput.value = '';
-                ingredientSearchInput.value = '';
-                resultsContainer.innerHTML = '';
-                resultsHeader.textContent = '';
-            };
+            clearSearch() {
+                this.elements.nameSearchInput.value = '';
+                this.elements.ingredientSearchInput.value = '';
+                this.elements.resultsContainer.innerHTML = '';
+                this.elements.resultsHeader.textContent = '';
+            },
 
-            const renderResults = (results) => {
-                resultsContainer.innerHTML = '';
+            renderResults(results) {
+                this.elements.resultsContainer.innerHTML = '';
                 if (!results || results.length === 0) {
-                    resultsHeader.textContent = 'Found 0 recipes.';
-                    resultsContainer.innerHTML = `<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-sm" role="alert"><p>Try a different search term.</p></div>`;
+                    this.elements.resultsHeader.textContent = 'Found 0 recipes.';
+                    this.elements.resultsContainer.innerHTML = `<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-sm" role="alert"><p>Try a different search term.</p></div>`;
                     return;
                 }
-                resultsHeader.textContent = `Found ${results.length} recipe(s).`;
+                this.elements.resultsHeader.textContent = `Found ${results.length} recipe(s).`;
                 results.forEach(recipe => {
                     const resultCard = document.createElement('div');
                     resultCard.className = 'bg-white p-5 rounded-xl shadow-md flex justify-between items-center cursor-pointer hover:shadow-lg hover:scale-105 transition-transform duration-200';
                     resultCard.innerHTML = `<div><span class="text-sm font-semibold text-blue-600">Recipe #${recipe.id}</span><h3 class="text-xl font-bold text-gray-800">${recipe.name}</h3></div><button class="bg-gray-800 text-white font-semibold px-4 py-2 rounded-lg hover:bg-black transition">View</button>`;
-                    resultCard.addEventListener('click', () => showRecipeDetails(recipe.id));
-                    resultsContainer.appendChild(resultCard);
+                    resultCard.addEventListener('click', () => this.showRecipeDetails(recipe.id));
+                    this.elements.resultsContainer.appendChild(resultCard);
                 });
-            };
+            },
 
-            const renderError = (message) => {
-                resultsHeader.textContent = 'Search Error';
-                resultsContainer.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-sm" role="alert"><p>${message}</p></div>`;
-            };
+            renderError(message) {
+                this.elements.resultsHeader.textContent = 'Search Error';
+                this.elements.resultsContainer.innerHTML = `<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-sm" role="alert"><p>${message}</p></div>`;
+            },
 
-            const showRecipeDetails = async (recipeId) => {
-                currentRecipeId = recipeId;
+            async showRecipeDetails(recipeId) {
+                this.currentRecipeId = recipeId;
                 try {
-                    const recipe = await apiRequest(`/api/recipes/${recipeId}`);
-                    modalRecipeName.textContent = recipe.name;
-                    modalIngredients.innerHTML = recipe.ingredients.map(ing => `<li><span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}</li>`).join('');
-                    modalInstructions.innerHTML = recipe.instructions.map(step => `<li>${step}</li>`).join('');
+                    const recipe = await this.apiRequest(`/api/recipes/${recipeId}`);
+                    this.elements.modalRecipeName.textContent = recipe.name;
+                    this.elements.modalIngredients.innerHTML = recipe.ingredients.map(ing => `<li><span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}</li>`).join('');
+                    this.elements.modalInstructions.innerHTML = recipe.instructions.map(step => `<li>${step}</li>`).join('');
                     
-                    await fetchAndRenderModalLogHistory(recipeId);
+                    await this.fetchAndRenderModalLogHistory(recipeId);
 
-                    recipeModal.classList.remove('hidden');
+                    this.elements.recipeModal.classList.remove('hidden');
                     document.body.style.overflow = 'hidden';
                 } catch (error) {
                     alert('Could not load recipe details.');
                 }
-            };
+            },
             
-            const fetchAndRenderModalLogHistory = async (recipeId) => {
+            async fetchAndRenderModalLogHistory(recipeId) {
                 try {
-                    const logs = await apiRequest(`/api/recipes/${recipeId}/log`);
-                    modalLogHistory.innerHTML = '';
+                    const logs = await this.apiRequest(`/api/recipes/${recipeId}/log`);
+                    this.elements.modalLogHistory.innerHTML = '';
                     if (!logs || logs.length === 0) {
-                        modalLogHistory.innerHTML = '<li>You haven''t logged this meal yet.</li>';
+                        this.elements.modalLogHistory.innerHTML = '<li>You haven''t logged this meal yet.</li>';
                     } else {
                         logs.forEach(log => {
                              const date = new Date(log.eaten_date + 'T00:00:00');
                              const formattedDate = date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-                             modalLogHistory.innerHTML += `<li>${formattedDate}</li>`;
+                             this.elements.modalLogHistory.innerHTML += `<li>${formattedDate}</li>`;
                         });
                     }
                 } catch(e){
-                     modalLogHistory.innerHTML = '<li>Could not load history.</li>';
+                     this.elements.modalLogHistory.innerHTML = '<li>Could not load history.</li>';
                 }
-            };
+            },
 
-            const hideModal = () => {
-                recipeModal.classList.add('hidden');
+            hideModal() {
+                this.elements.recipeModal.classList.add('hidden');
                 document.body.style.overflow = '';
-                currentRecipeId = null;
-            };
+                this.currentRecipeId = null;
+            },
             
-            const saveLog = async () => {
-                const eaten_date = logDateInput.value;
-                if (!eaten_date || !currentRecipeId) return;
+            async saveLog() {
+                const eaten_date = this.elements.logDateInput.value;
+                if (!eaten_date || !this.currentRecipeId) return;
 
-                logStatusMsg.textContent = 'Saving...';
+                this.elements.logStatusMsg.textContent = 'Saving...';
                 try {
                     const options = {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ recipe_id: currentRecipeId, eaten_date, notes: '' })
+                        body: JSON.stringify({ recipe_id: this.currentRecipeId, eaten_date, notes: '' })
                     };
-                    await apiRequest('/api/log', options);
-                    logStatusMsg.textContent = 'Saved successfully!';
-                    await fetchAndRenderModalLogHistory(currentRecipeId);
-                    setTimeout(() => logStatusMsg.textContent = '', 2000);
+                    await this.apiRequest('/api/log', options);
+                    this.elements.logStatusMsg.textContent = 'Saved successfully!';
+                    await this.fetchAndRenderModalLogHistory(this.currentRecipeId);
+                    setTimeout(() => { this.elements.logStatusMsg.textContent = '' }, 2000);
                 } catch (error) {
-                     logStatusMsg.textContent = 'Failed to save.';
+                     this.elements.logStatusMsg.textContent = 'Failed to save.';
                 }
-            };
-            
-            const fetchUserInfo = async () => {
-                try {
-                    const identity = await apiRequest('/cdn-cgi/access/get-identity');
-                    if (identity && identity.email) {
-                        userEmailDisplay.textContent = `Logged in as: ${identity.email}`;
-                    }
-                } catch (e) {
-                    console.error('Could not fetch user identity. This is normal during local development if not logged in.');
-                    userEmailDisplay.textContent = 'Could not verify user. Please log in.';
-                }
-            };
-            
-            initializeApp();
-        });
+            }
+        };
+
+        app.init();
+    });
     </script>
 </body>
 </html>
