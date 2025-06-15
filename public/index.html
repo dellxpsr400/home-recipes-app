@@ -39,40 +39,40 @@
                 <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-4">
                     <h2 class="text-xl md:text-2xl font-semibold mb-3">Search by Recipe Name</h2>
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="text" id="nameSearchInput" placeholder="e.g., 'Cashew Pie'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
-                        <button id="nameSearchBtn" class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow">Search</button>
+                        <input type="text" id="name-search-input" placeholder="e.g., 'Cashew Pie'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
+                        <button id="name-search-btn" class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow">Search</button>
                     </div>
                 </div>
                 <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-6">
                     <h2 class="text-xl md:text-2xl font-semibold mb-3">Search by Ingredients</h2>
                     <p class="text-gray-500 mb-3 text-sm">Enter one or more ingredients, separated by commas.</p>
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="text" id="ingredientSearchInput" placeholder="e.g., 'tomatoes, garlic'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition">
-                        <button id="ingredientSearchBtn" class="bg-green-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-green-700 transition shadow">Search</button>
+                        <input type="text" id="ingredient-search-input" placeholder="e.g., 'tomatoes, garlic'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition">
+                        <button id="ingredient-search-btn" class="bg-green-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-green-700 transition shadow">Search</button>
                     </div>
                 </div>
                 <div class="flex justify-between items-center mb-4">
-                    <h3 id="resultsHeader" class="text-lg font-semibold text-gray-700">&nbsp;</h3>
-                    <button id="clearSearchBtn" class="bg-gray-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-gray-600 transition shadow-sm text-sm">Clear Search</button>
+                    <h3 id="results-header" class="text-lg font-semibold text-gray-700">&nbsp;</h3>
+                    <button id="clear-search-btn" class="bg-gray-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-gray-600 transition shadow-sm text-sm">Clear Search</button>
                 </div>
-                <div id="resultsContainer" class="space-y-4"></div>
+                <div id="results-container" class="space-y-4"></div>
             </main>
         </div>
 
         <!-- Meal Log View -->
         <div id="log-view" class="view-hidden">
              <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Your Meal History</h2>
-             <div id="logContainer" class="space-y-3"></div>
+             <div id="log-container" class="space-y-3"></div>
         </div>
 
     </div>
 
     <!-- Recipe Details Modal -->
-    <div id="recipeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
-        <div id="modalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div id="recipe-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
+        <div id="modal-content" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
             <div class="p-6 border-b border-gray-200 flex justify-between items-center">
-                <h2 id="modalRecipeName" class="text-2xl md:text-3xl font-bold">&nbsp;</h2>
-                <button id="closeModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
+                <h2 id="modal-recipe-name" class="text-2xl md:text-3xl font-bold">&nbsp;</h2>
+                <button id="close-modal-btn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
             </div>
             <div id="modal-body" class="p-6 overflow-y-auto custom-scrollbar">
                 <div id="log-meal-section" class="bg-blue-50 p-4 rounded-lg mb-6">
@@ -89,11 +89,11 @@
                 </div>
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold mb-3">Ingredients</h3>
-                    <ul id="modalIngredients" class="list-disc list-inside space-y-2"></ul>
+                    <ul id="modal-ingredients" class="list-disc list-inside space-y-2"></ul>
                 </div>
                 <div>
                     <h3 class="text-xl font-semibold mb-3">Instructions</h3>
-                    <ol id="modalInstructions" class="list-decimal list-inside space-y-3"></ol>
+                    <ol id="modal-instructions" class="list-decimal list-inside space-y-3"></ol>
                 </div>
             </div>
         </div>
@@ -104,7 +104,8 @@
     </div>
 
     <script>
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', function() {
+        // This is a wrapper to catch any critical errors during initialization.
         try {
             const app = {
                 currentRecipeId: null,
@@ -115,11 +116,8 @@
                     this.setupEventListeners();
                     this.fetchUserInfo();
                 },
-
-                // CORRECTED: This function now converts kebab-case IDs to camelCase properties
-                // to match how they are called in the rest of the code.
+                
                 cacheDOMElements() {
-                    const toCamelCase = (str) => str.replace(/-([a-z])/g, g => g[1].toUpperCase());
                     const ids = [
                         'name-search-input', 'name-search-btn', 'ingredient-search-input', 'ingredient-search-btn', 
                         'results-container', 'results-header', 'clear-search-btn', 'user-email', 'show-search-btn', 
@@ -128,29 +126,27 @@
                         'log-date-input', 'save-log-btn', 'log-status-msg', 'loader'
                     ];
                     ids.forEach(id => {
-                        this.elements[toCamelCase(id)] = document.getElementById(id);
+                        this.elements[id] = document.getElementById(id);
                     });
                 },
 
                 setupEventListeners() {
-                    const addListener = (element, event, handler) => {
-                        if (element) {
-                            element.addEventListener(event, handler);
-                        } else {
-                            // This check is now redundant because of the fix, but good for safety.
+                    const addListener = (id, event, handler) => {
+                        if (this.elements[id]) {
+                            this.elements[id].addEventListener(event, handler);
                         }
                     };
 
-                    addListener(this.elements.showSearchBtn, 'click', () => this.switchView('search'));
-                    addListener(this.elements.showLogBtn, 'click', () => this.switchView('log'));
-                    addListener(this.elements.nameSearchBtn, 'click', () => this.searchByName());
-                    addListener(this.elements.ingredientSearchBtn, 'click', () => this.searchByIngredients());
-                    addListener(this.elements.clearSearchBtn, 'click', () => this.clearSearch());
-                    addListener(this.elements.nameSearchInput, 'keyup', e => { if (e.key === 'Enter') this.searchByName(); });
-                    addListener(this.elements.ingredientSearchInput, 'keyup', e => { if (e.key === 'Enter') this.searchByIngredients(); });
-                    addListener(this.elements.closeModalBtn, 'click', () => this.hideModal());
-                    addListener(this.elements.recipeModal, 'click', e => { if (e.target === this.elements.recipeModal) this.hideModal(); });
-                    addListener(this.elements.saveLogBtn, 'click', () => this.saveLog());
+                    addListener('showSearchBtn', 'click', () => this.switchView('search'));
+                    addListener('showLogBtn', 'click', () => this.switchView('log'));
+                    addListener('nameSearchBtn', 'click', () => this.searchByName());
+                    addListener('ingredientSearchBtn', 'click', () => this.searchByIngredients());
+                    addListener('clearSearchBtn', 'click', () => this.clearSearch());
+                    addListener('nameSearchInput', 'keyup', e => { if (e.key === 'Enter') this.searchByName(); });
+                    addListener('ingredientSearchInput', 'keyup', e => { if (e.key === 'Enter') this.searchByIngredients(); });
+                    addListener('closeModalBtn', 'click', () => this.hideModal());
+                    addListener('recipeModal', 'click', e => { if (e.target === this.elements.recipeModal) this.hideModal(); });
+                    addListener('saveLogBtn', 'click', () => this.saveLog());
                     
                     if (this.elements.logDateInput) {
                         this.elements.logDateInput.valueAsDate = new Date();
@@ -164,15 +160,12 @@
                         }
                     });
                 },
-
+                
                 async apiRequest(endpoint, options = {}) {
                     this.showLoader(true);
                     try {
                         const response = await fetch(endpoint, options);
-                        if (!response.ok) {
-                             const errorText = await response.text();
-                             throw new Error(`API Error: ${response.status} - ${errorText}`);
-                        }
+                        if (!response.ok) throw new Error(`API Error: ${response.status}`);
                         if (response.headers.get("content-type")?.includes("application/json")) {
                             return response.json();
                         }
@@ -185,7 +178,7 @@
                     }
                 },
 
-                showLoader(show) { if (this.elements.loader) this.elements.loader.classList.toggle('hidden', !show); },
+                showLoader(show) { if(this.elements.loader) this.elements.loader.classList.toggle('hidden', !show); },
                 
                 switchView(view) {
                     this.elements.searchView.classList.toggle('view-hidden', view !== 'search');
