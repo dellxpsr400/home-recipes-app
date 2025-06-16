@@ -1,10 +1,6 @@
--- First, add the new 'tags' column to the recipes table if it doesn't already exist.
--- The IF NOT EXISTS clause is not supported in all SQL versions D1 uses, 
--- but running this multiple times won't cause an error after the first success.
--- We'll add this command inside a block that ignores errors.
-BEGIN;
+-- First, add the new 'tags' column to the recipes table.
+-- Note: This command may return an error if the column already exists, which is safe to ignore.
 ALTER TABLE recipes ADD COLUMN tags TEXT;
-COMMIT;
 
 -- Now, update each existing recipe to add some default tags.
 UPDATE recipes SET tags = 'Vegan, Main Course, Pie' WHERE id = 1;

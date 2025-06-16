@@ -1,13 +1,8 @@
 // This file defines the backend API for your recipe application.
-// This version includes the corrected headers for all responses.
+// This version adds full support for recipe tags.
 
 interface Env {
   DB: D1Database;
-}
-
-// Helper function to get user's email from Cloudflare Access
-function getUserId(request: Request): string | null {
-  return request.headers.get("Cf-Access-Authenticated-User-Email");
 }
 
 // Helper function to create a JSON response with correct headers
@@ -18,11 +13,16 @@ function jsonResponse(data: any, status = 200) {
     });
 }
 
+// Helper function to get user's email from Cloudflare Access
+function getUserId(request: Request): string | null {
+  return request.headers.get("Cf-Access-Authenticated-User-Email");
+}
+
 export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
   const url = new URL(request.url);
 
-  // --- Handle POST requests for creating new logs ---
+  // --- Handle POST requests (unchanged) ---
   if (request.method === 'POST') {
     const userId = getUserId(request);
     if (!userId) return jsonResponse({ error: 'Authentication required.' }, 401);
@@ -43,20 +43,33 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
   }
 
-  // --- Handle GET requests for fetching data ---
+  // --- Handle GET requests ---
   if (request.method === 'GET') {
     const userId = getUserId(request);
     
-    // --- Get Total Recipe Count ---
-    if (url.pathname === '/api/recipes/count') {
-      const { count } = await env.DB.prepare('SELECT COUNT(*) as count FROM recipes').first<{ count: number }>();
-      return jsonResponse({ total: count || 0 });
+    // --- Get all unique tags ---
+    if (url.pathname === '/api/tags') {
+        const { results } = await env.DB.prepare("SELECT tags FROM recipes WHERE tags IS NOT NULL AND tags != ''").all();
+        const allTags = new Set<string>();
+        results.forEach((row: { tags: string }) => {
+            row.tags.split(',').map(tag => tag.trim()).forEach(tag => allTags.add(tag));
+        });
+        return jsonResponse(Array.from(allTags).sort());
+    }
+      
+    // --- Search by tag ---
+    if (url.pathname === '/api/recipes/search/tag') {
+        const tag = url.searchParams.get('q') || '';
+        if (!tag) return jsonResponse([]);
+        const stmt = env.DB.prepare("SELECT id, name, tags FROM recipes WHERE LOWER(tags) LIKE ?1");
+        const { results } = await stmt.bind(`%${tag.toLowerCase()}%`).all();
+        return jsonResponse(results || []);
     }
 
     // --- Search by Recipe Name ---
     if (url.pathname === '/api/recipes/search/name') {
       const query = url.searchParams.get('q') || '';
-      const stmt = env.DB.prepare('SELECT id, name FROM recipes WHERE LOWER(name) LIKE ?1');
+      const stmt = env.DB.prepare('SELECT id, name, tags FROM recipes WHERE LOWER(name) LIKE ?1');
       const { results } = await stmt.bind(`%${query.toLowerCase()}%`).all();
       return jsonResponse(results || []);
     }
@@ -68,23 +81,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (ingredients.length === 0) return jsonResponse([]);
       
       const whereClauses = ingredients.map(() => 'LOWER(ingredients) LIKE ?');
-      const sqlQuery = `SELECT id, name FROM recipes WHERE ${whereClauses.join(' AND ')}`;
+      const sqlQuery = `SELECT id, name, tags FROM recipes WHERE ${whereClauses.join(' AND ')}`;
       const queryParams = ingredients.map(ing => `%${ing}%`);
       const stmt = env.DB.prepare(sqlQuery);
       const { results } = await stmt.bind(...queryParams).all();
       return jsonResponse(results || []);
     }
-    
-    // --- Get a Single Recipe by ID ---
-    if (url.pathname.startsWith('/api/recipes/') && url.pathname.endsWith('/log') === false) {
+      
+    // --- Get a Single Recipe by ID (now includes tags) ---
+    if (url.pathname.startsWith('/api/recipes/') && !url.pathname.endsWith('/log') && !url.pathname.includes('/search/')) {
       const id = url.pathname.split('/')[3];
       const recipeData = await env.DB.prepare('SELECT * FROM recipes WHERE id = ?1').bind(id).first();
       if (!recipeData) return jsonResponse({ error: 'Recipe not found.' }, 404);
       const recipe = { ...recipeData, ingredients: JSON.parse(recipeData.ingredients as string), instructions: JSON.parse(recipeData.instructions as string) };
       return jsonResponse(recipe);
     }
-
-    // --- Get All Meal Logs for the Current User ---
+      
+    // --- LOGS (Unchanged) ---
     if (url.pathname === '/api/log') {
       if (!userId) return jsonResponse({ error: 'Authentication required.' }, 401);
       const stmt = env.DB.prepare(`
@@ -97,8 +110,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const { results } = await stmt.bind(userId).all();
       return jsonResponse(results || []);
     }
-
-    // --- Get Meal Logs for a Specific Recipe for the Current User ---
+      
     if (url.pathname.startsWith('/api/recipes/') && url.pathname.endsWith('/log')) {
       if (!userId) return jsonResponse({ error: 'Authentication required.' }, 401);
       const id = url.pathname.split('/')[3];
