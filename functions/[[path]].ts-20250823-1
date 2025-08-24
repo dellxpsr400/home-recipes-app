@@ -1,5 +1,5 @@
 // This file defines the backend API for your recipe application.
-// This version is updated to handle the sectioned ingredient data format.
+// This version adds full support for recipe tags.
 
 interface Env {
   DB: D1Database;
@@ -74,17 +74,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return jsonResponse(results || []);
     }
 
-    // --- Search by Ingredients (UPDATED for new data structure) ---
+    // --- Search by Ingredients ---
     if (url.pathname === '/api/recipes/search/ingredient') {
       const query = url.searchParams.get('q') || '';
       const ingredients = query.split(',').map(ing => ing.trim().toLowerCase()).filter(ing => ing);
       if (ingredients.length === 0) return jsonResponse([]);
       
-      // This WHERE clause searches for the ingredient name inside the JSON "items" array.
       const whereClauses = ingredients.map(() => 'LOWER(ingredients) LIKE ?');
       const sqlQuery = `SELECT id, name, tags FROM recipes WHERE ${whereClauses.join(' AND ')}`;
-      const queryParams = ingredients.map(ing => `%"name":"%${ing}%"`);
-      
+      const queryParams = ingredients.map(ing => `%${ing}%`);
       const stmt = env.DB.prepare(sqlQuery);
       const { results } = await stmt.bind(...queryParams).all();
       return jsonResponse(results || []);

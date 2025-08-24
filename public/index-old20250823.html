@@ -14,7 +14,7 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #555; }
-        #recipeModal, #loader { transition: opacity 0.3s ease; }
+        #recipe-modal, #loader { transition: opacity 0.3s ease; }
         .view-hidden { display: none !important; }
     </style>
 </head>
@@ -26,78 +26,82 @@
         <!-- Header Section -->
         <header class="text-center mb-6 border-b pb-4">
             <div class="flex justify-between items-center mb-2">
-                 <button id="showSearchBtn" class="text-blue-600 font-semibold hover:underline disabled:text-gray-400 disabled:no-underline" disabled>Recipe Search</button>
-                 <button id="showLogBtn" class="text-blue-600 font-semibold hover:underline disabled:text-gray-400 disabled:no-underline">Meal Log</button>
+                 <button id="show-search-btn" class="text-blue-600 font-semibold hover:underline disabled:text-gray-400 disabled:no-underline" disabled>Recipe Search</button>
+                 <button id="show-log-btn" class="text-blue-600 font-semibold hover:underline disabled:text-gray-400 disabled:no-underline">Meal Log</button>
             </div>
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900">My Home Recipes</h1>
-            <p id="userEmail" class="text-gray-500 text-sm mt-2 h-5"></p>
+            <p id="user-email" class="text-gray-500 text-sm mt-2 h-5"></p>
         </header>
 
         <!-- Search View -->
-        <div id="searchView">
+        <div id="search-view">
             <main>
-                 <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-6">
+                 <!-- Tags/Categories Section -->
+                <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-6">
                     <h2 class="text-xl md:text-2xl font-semibold mb-4">Filter by Category</h2>
-                    <div id="tagsContainer" class="flex flex-wrap gap-2"></div>
+                    <div id="tags-container" class="flex flex-wrap gap-2">
+                        <!-- Tag buttons will be dynamically inserted here -->
+                    </div>
                 </div>
+
                 <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-4">
                     <h2 class="text-xl md:text-2xl font-semibold mb-3">Search by Recipe Name</h2>
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="text" id="nameSearchInput" placeholder="e.g., 'Cashew Pie'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
-                        <button id="nameSearchBtn" class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow">Search</button>
+                        <input type="text" id="name-search-input" placeholder="e.g., 'Cashew Pie'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
+                        <button id="name-search-btn" class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow">Search</button>
                     </div>
                 </div>
                 <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-6">
                     <h2 class="text-xl md:text-2xl font-semibold mb-3">Search by Ingredients</h2>
                     <p class="text-gray-500 mb-3 text-sm">Enter one or more ingredients, separated by commas.</p>
                     <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="text" id="ingredientSearchInput" placeholder="e.g., 'tomatoes, garlic'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition">
-                        <button id="ingredientSearchBtn" class="bg-green-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-green-700 transition shadow">Search</button>
+                        <input type="text" id="ingredient-search-input" placeholder="e.g., 'tomatoes, garlic'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition">
+                        <button id="ingredient-search-btn" class="bg-green-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-green-700 transition shadow">Search</button>
                     </div>
                 </div>
                 <div class="flex justify-between items-center mb-4">
-                    <h3 id="resultsHeader" class="text-lg font-semibold text-gray-700">&nbsp;</h3>
-                    <button id="clearSearchBtn" class="bg-gray-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-gray-600 transition shadow-sm text-sm">Clear Search</button>
+                    <h3 id="results-header" class="text-lg font-semibold text-gray-700">&nbsp;</h3>
+                    <button id="clear-search-btn" class="bg-gray-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-gray-600 transition shadow-sm text-sm">Clear Search</button>
                 </div>
-                <div id="resultsContainer" class="space-y-4"></div>
+                <div id="results-container" class="space-y-4"></div>
             </main>
         </div>
 
         <!-- Meal Log View -->
-        <div id="logView" class="view-hidden">
+        <div id="log-view" class="view-hidden">
              <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Your Meal History</h2>
-             <div id="logContainer" class="space-y-3"></div>
+             <div id="log-container" class="space-y-3"></div>
         </div>
 
     </div>
 
     <!-- Recipe Details Modal -->
-    <div id="recipeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
-        <div id="modalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div id="recipe-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
+        <div id="modal-content" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
             <div class="p-6 border-b border-gray-200 flex justify-between items-center">
-                <h2 id="modalRecipeName" class="text-2xl md:text-3xl font-bold">&nbsp;</h2>
-                <button id="closeModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
+                <h2 id="modal-recipe-name" class="text-2xl md:text-3xl font-bold">&nbsp;</h2>
+                <button id="close-modal-btn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
             </div>
-            <div id="modalBody" class="p-6 overflow-y-auto custom-scrollbar">
-                <div id="logMealSection" class="bg-blue-50 p-4 rounded-lg mb-6">
+            <div id="modal-body" class="p-6 overflow-y-auto custom-scrollbar">
+                <div id="log-meal-section" class="bg-blue-50 p-4 rounded-lg mb-6">
                     <h3 class="text-xl font-semibold mb-3">Log this Meal</h3>
                     <div class="flex flex-col sm:flex-row gap-3 items-center">
-                        <input type="date" id="logDateInput" class="p-2 border rounded-lg flex-grow w-full sm:w-auto">
-                        <button id="saveLogBtn" class="bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto">Save to Log</button>
+                        <input type="date" id="log-date-input" class="p-2 border rounded-lg flex-grow w-full sm:w-auto">
+                        <button id="save-log-btn" class="bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto">Save to Log</button>
                     </div>
-                    <p id="logStatusMsg" class="text-sm text-green-700 mt-2 h-4"></p>
+                    <p id="log-status-msg" class="text-sm text-green-700 mt-2 h-4"></p>
                 </div>
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold mb-3">Your History for this Recipe</h3>
-                    <ul id="modalLogHistory" class="list-disc list-inside space-y-1 text-gray-600"></ul>
+                    <ul id="modal-log-history" class="list-disc list-inside space-y-1 text-gray-600"></ul>
                 </div>
                 <div class="mb-6">
                     <h3 class="text-xl font-semibold mb-3">Ingredients</h3>
-                    <div id="modalIngredientsContainer"></div>
+                    <ul id="modal-ingredients" class="list-disc list-inside space-y-2"></ul>
                 </div>
                 <div>
                     <h3 class="text-xl font-semibold mb-3">Instructions</h3>
-                    <ol id="modalInstructions" class="list-decimal list-inside space-y-3"></ol>
+                    <ol id="modal-instructions" class="list-decimal list-inside space-y-3"></ol>
                 </div>
             </div>
         </div>
@@ -117,11 +121,16 @@
             getEl('loader').classList.remove('hidden');
             try {
                 const response = await fetch(endpoint, options);
-                if (!response.ok) throw new Error(`API Error: ${response.status}`);
-                if (response.headers.get("content-type")?.includes("application/json")) return response.json();
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.includes("application/json")) {
+                    return response.json();
+                }
                 return null;
             } catch (error) {
-                console.error(`API request failed:`, error);
+                console.error(`API request to ${endpoint} failed:`, error);
                 throw error;
             } finally {
                 getEl('loader').classList.add('hidden');
@@ -129,7 +138,7 @@
         };
         
         const renderTags = (tags) => {
-            const container = getEl('tagsContainer');
+            const container = getEl('tags-container');
             if (!container) return;
             container.innerHTML = '';
             tags.forEach(tag => {
@@ -142,8 +151,8 @@
         };
 
         const renderResults = (results) => {
-            const container = getEl('resultsContainer');
-            const header = getEl('resultsHeader');
+            const container = getEl('results-container');
+            const header = getEl('results-header');
             container.innerHTML = '';
             header.textContent = `Found ${results?.length || 0} recipe(s).`;
             if (!results || results.length === 0) {
@@ -171,7 +180,7 @@
         const fetchAndRenderFullLog = async () => {
             try {
                 const logs = await apiRequest('/api/log');
-                const container = getEl('logContainer');
+                const container = getEl('log-container');
                 container.innerHTML = '';
                 if (!logs || logs.length === 0) {
                     container.innerHTML = "<p class='text-center text-gray-500'>You haven't logged any meals yet.</p>";
@@ -186,16 +195,18 @@
                     container.appendChild(logEntry);
                 });
             } catch (error) {
-                getEl('logContainer').innerHTML = '<p class="text-center text-red-500">Could not load meal history.</p>';
+                getEl('log-container').innerHTML = '<p class="text-center text-red-500">Could not load meal history.</p>';
             }
         };
 
         const switchView = (view) => {
-            getEl('searchView').classList.toggle('view-hidden', view !== 'search');
-            getEl('logView').classList.toggle('view-hidden', view !== 'log');
-            getEl('showSearchBtn').disabled = view === 'search';
-            getEl('showLogBtn').disabled = view === 'log';
-            if (view === 'log') fetchAndRenderFullLog();
+            getEl('search-view').classList.toggle('view-hidden', view !== 'search');
+            getEl('log-view').classList.toggle('view-hidden', view !== 'log');
+            getEl('show-search-btn').disabled = view === 'search';
+            getEl('show-log-btn').disabled = view === 'log';
+            if (view === 'log') {
+                fetchAndRenderFullLog();
+            }
         };
 
         const search = async (endpoint, query) => {
@@ -204,8 +215,8 @@
                 const results = await apiRequest(`${endpoint}?q=${encodeURIComponent(query.trim())}`);
                 renderResults(results);
             } catch (error) { 
-                getEl('resultsHeader').textContent = 'Search Error';
-                getEl('resultsContainer').innerHTML = '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-sm"><p>Could not fetch recipes.</p></div>';
+                getEl('results-header').textContent = 'Search Error';
+                getEl('results-container').innerHTML = '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-sm"><p>Could not fetch recipes. Please try again later.</p></div>';
             }
         };
 
@@ -213,45 +224,17 @@
             currentRecipeId = recipeId;
             try {
                 const recipe = await apiRequest(`/api/recipes/${recipeId}`);
-                getEl('modalRecipeName').textContent = recipe.name;
-                
-                const ingredientsContainer = getEl('modalIngredientsContainer');
-                ingredientsContainer.innerHTML = ''; 
-                
-                if (Array.isArray(recipe.ingredients)) {
-                    recipe.ingredients.forEach(section => {
-                        if (section.section_title) {
-                            const sectionTitle = document.createElement('h4');
-                            sectionTitle.className = 'font-semibold text-lg mt-4 mb-2';
-                            sectionTitle.textContent = section.section_title;
-                            ingredientsContainer.appendChild(sectionTitle);
-                        }
-
-                        const itemList = document.createElement('ul');
-                        itemList.className = 'list-disc list-inside space-y-2';
-                        if (Array.isArray(section.items)) {
-                            section.items.forEach(ing => {
-                                const itemEl = document.createElement('li');
-                                itemEl.innerHTML = `<span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}`;
-                                itemList.appendChild(itemEl);
-                            });
-                        }
-                        ingredientsContainer.appendChild(itemList);
-                    });
-                }
-
-                getEl('modalInstructions').innerHTML = recipe.instructions.map(step => `<li>${step}</li>`).join('');
+                getEl('modal-recipe-name').textContent = recipe.name;
+                getEl('modal-ingredients').innerHTML = recipe.ingredients.map(ing => `<li><span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}</li>`).join('');
+                getEl('modal-instructions').innerHTML = recipe.instructions.map(step => `<li>${step}</li>`).join('');
                 await renderModalLogHistory(recipeId);
-                getEl('recipeModal').classList.remove('hidden');
+                getEl('recipe-modal').classList.remove('hidden');
                 document.body.style.overflow = 'hidden';
-            } catch (error) { 
-                console.error("Error showing recipe details:", error);
-                alert('Could not load recipe details.'); 
-            }
+            } catch (error) { alert('Could not load recipe details.'); }
         };
 
         const renderModalLogHistory = async (recipeId) => {
-            const historyEl = getEl('modalLogHistory');
+            const historyEl = getEl('modal-log-history');
             try {
                 const logs = await apiRequest(`/api/recipes/${recipeId}/log`);
                 historyEl.innerHTML = (!logs || logs.length === 0)
@@ -266,15 +249,15 @@
         };
 
         const hideModal = () => {
-            getEl('recipeModal').classList.add('hidden');
+            getEl('recipe-modal').classList.add('hidden');
             document.body.style.overflow = '';
             currentRecipeId = null;
         };
         
         const saveLog = async () => {
-            const eaten_date = getEl('logDateInput').value;
+            const eaten_date = getEl('log-date-input').value;
             if (!eaten_date || !currentRecipeId) return;
-            const msgEl = getEl('logStatusMsg');
+            const msgEl = getEl('log-status-msg');
             msgEl.textContent = 'Saving...';
             try {
                 await apiRequest('/api/log', {
@@ -290,43 +273,44 @@
             }
         };
 
-        // --- Event Listeners & Initial Load ---
-        getEl('showSearchBtn').addEventListener('click', () => switchView('search'));
-        getEl('showLogBtn').addEventListener('click', () => switchView('log'));
-        getEl('nameSearchBtn').addEventListener('click', () => search('/api/recipes/search/name', getEl('nameSearchInput').value));
-        getEl('ingredientSearchBtn').addEventListener('click', () => search('/api/recipes/search/ingredient', getEl('ingredientSearchInput').value));
-        getEl('clearSearchBtn').addEventListener('click', () => {
-            getEl('nameSearchInput').value = '';
-            getEl('ingredientSearchInput').value = '';
-            getEl('resultsContainer').innerHTML = '';
-            getEl('resultsHeader').textContent = '';
+        // --- Event Listeners ---
+        getEl('show-search-btn').addEventListener('click', () => switchView('search'));
+        getEl('show-log-btn').addEventListener('click', () => switchView('log'));
+        getEl('name-search-btn').addEventListener('click', () => search('/api/recipes/search/name', getEl('name-search-input').value));
+        getEl('ingredient-search-btn').addEventListener('click', () => search('/api/recipes/search/ingredient', getEl('ingredient-search-input').value));
+        getEl('clear-search-btn').addEventListener('click', () => {
+            getEl('name-search-input').value = '';
+            getEl('ingredient-search-input').value = '';
+            getEl('results-container').innerHTML = '';
+            getEl('results-header').textContent = '';
         });
-        getEl('nameSearchInput').addEventListener('keyup', e => { if (e.key === 'Enter') search('/api/recipes/search/name', e.target.value); });
-        getEl('ingredientSearchInput').addEventListener('keyup', e => { if (e.key === 'Enter') search('/api/recipes/search/ingredient', e.target.value); });
-        getEl('closeModalBtn').addEventListener('click', hideModal);
-        getEl('recipeModal').addEventListener('click', e => { if (e.target.id === 'recipeModal') hideModal(); });
-        getEl('saveLogBtn').addEventListener('click', saveLog);
+        getEl('name-search-input').addEventListener('keyup', e => { if (e.key === 'Enter') search('/api/recipes/search/name', e.target.value); });
+        getEl('ingredient-search-input').addEventListener('keyup', e => { if (e.key === 'Enter') search('/api/recipes/search/ingredient', e.target.value); });
+        getEl('close-modal-btn').addEventListener('click', hideModal);
+        getEl('recipe-modal').addEventListener('click', e => { if (e.target.id === 'recipe-modal') hideModal(); });
+        getEl('save-log-btn').addEventListener('click', saveLog);
         
         document.body.addEventListener('click', e => {
-            const link = e.target.closest('#logContainer a[data-recipe-id]');
+            const link = e.target.closest('#log-container a[data-recipe-id]');
             if (link) {
                 e.preventDefault();
                 showRecipeDetails(link.dataset.recipeId);
             }
         });
 
-        getEl('logDateInput').valueAsDate = new Date();
+        // --- Initial Load ---
+        getEl('log-date-input').valueAsDate = new Date();
         
         apiRequest('/api/tags').then(renderTags).catch(err => console.error("Failed to load tags", err));
-        
+
         apiRequest('/cdn-cgi/access/get-identity')
             .then(identity => {
                 if (identity && identity.email) {
-                    getEl('userEmail').textContent = 'Logged in as: ' + identity.email;
+                    getEl('user-email').textContent = 'Logged in as: ' + identity.email;
                 }
             })
             .catch(() => {
-                getEl('userEmail').textContent = 'Not logged in (this is normal for local testing).';
+                getEl('user-email').textContent = 'Not logged in (this is normal for local testing).';
             });
     });
     </script>
