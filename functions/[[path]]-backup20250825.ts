@@ -74,42 +74,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return jsonResponse(results || []);
     }
 
- // --- Search by Ingredients (RECOMMENDED SOLUTION) ---
-if (url.pathname === '/api/recipes/search/ingredient') {
-    const query = url.searchParams.get('q') || '';
-    const ingredients = query.split(',').map(ing => ing.trim().toLowerCase()).filter(ing => ing);
-
-    if (ingredients.length === 0) {
-        return jsonResponse([]);
-    }
-
-    // Build a WHERE clause that uses a subquery for each ingredient.
-    // This precisely checks if an ingredient with the given name exists in the JSON.
-    const whereClauses = ingredients.map(() => 
-        `EXISTS (
-            SELECT 1 
-            FROM json_tree(recipes.ingredients) 
-            WHERE key = 'name' AND LOWER(value) LIKE ?
-        )`
-    );
-
-    const sqlQuery = `SELECT id, name, tags FROM recipes WHERE ${whereClauses.join(' AND ')}`;
-    
-    // The query parameters are now correctly formatted for the LIKE clause.
-    const queryParams = ingredients.map(ing => `%${ing}%`);
-
-    const stmt = env.DB.prepare(sqlQuery);
-    const { results } = await stmt.bind(...queryParams).all();
-
-    return jsonResponse(results || []);
-}
-     if (url.pathname.startsWith('/api/recipes/') && url.pathname.endsWith('/log')) {
-      if (!userId) return jsonResponse({ error: 'Authentication required.' }, 401);
-      const id = url.pathname.split('/')[3];
-      const stmt = env.DB.prepare('SELECT eaten_date, notes FROM meal_log WHERE recipe_id = ?1 AND user_id = ?2 ORDER BY eaten_date DESC');
-      const { results } = await stmt.bind(id, userId).all();
+    // --- Search by Ingredients (UPDATED for new data structure) ---
+    if (url.pathname === '/api/recipes/search/ingredient') {
+      const query = url.searchParams.get('q') || '';
+      const ingredients = query.split(',').map(ing => ing.trim().toLowerCase()).filter(ing => ing);
+      if (ingredients.length === 0) return jsonResponse([]);
+      
+      // This WHERE clause searches for the ingredient name inside the JSON "items" array.
+      const whereClauses = ingredients.map(() => 'LOWER(ingredients) LIKE ?');
+      const sqlQuery = `SELECT id, name, tags FROM recipes WHERE ${whereClauses.join(' AND ')}`;
+      const queryParams = ingredients.map(ing => `%"name":"%${ing}%"`);
+      
+      const stmt = env.DB.prepare(sqlQuery);
+      const { results } = await stmt.bind(...queryParams).all();
       return jsonResponse(results || []);
-    }   
+    }
+      
     // --- Get a Single Recipe by ID (now includes tags) ---
     if (url.pathname.startsWith('/api/recipes/') && !url.pathname.endsWith('/log') && !url.pathname.includes('/search/')) {
       const id = url.pathname.split('/')[3];
@@ -133,7 +113,13 @@ if (url.pathname === '/api/recipes/search/ingredient') {
       return jsonResponse(results || []);
     }
       
-  
+    if (url.pathname.startsWith('/api/recipes/') && url.pathname.endsWith('/log')) {
+      if (!userId) return jsonResponse({ error: 'Authentication required.' }, 401);
+      const id = url.pathname.split('/')[3];
+      const stmt = env.DB.prepare('SELECT eaten_date, notes FROM meal_log WHERE recipe_id = ?1 AND user_id = ?2 ORDER BY eaten_date DESC');
+      const { results } = await stmt.bind(id, userId).all();
+      return jsonResponse(results || []);
+    }
   }
 
   // Fallback for any unhandled routes
