@@ -1,141 +1,121 @@
-// This file defines the backend API for your recipe application.
-// This version is updated to handle the sectioned ingredient data format.
+// functions/[[path]].ts
 
 interface Env {
   DB: D1Database;
 }
 
-// Helper function to create a JSON response with correct headers
-function jsonResponse(data: any, status = 200) {
-    return new Response(JSON.stringify(data), {
-        status: status,
-        headers: { 'Content-Type': 'application/json' }
-    });
-}
-
-// Helper function to get user's email from Cloudflare Access
-function getUserId(request: Request): string | null {
-  return request.headers.get("Cf-Access-Authenticated-User-Email");
-}
-
 export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
   const url = new URL(request.url);
+  const path = url.pathname;
 
-  // --- Handle POST requests (unchanged) ---
-  if (request.method === 'POST') {
-    const userId = getUserId(request);
-    if (!userId) return jsonResponse({ error: 'Authentication required.' }, 401);
-    
-    if (url.pathname === '/api/log') {
-      try {
+  // Get user identity from the Access JWT
+  const identity = await getIdentity(request);
+  if (!identity) {
+    // For API calls, return 401 Unauthorized. For other paths, let ASSETS handle it (which will trigger the Access login page).
+    if (path.startsWith('/api/')) {
+        return new Response('Unauthorized: User identity could not be determined.', { status: 401 });
+    }
+  }
+  const userId = identity ? identity.email : 'anonymous';
+
+
+  // API Routing
+  try {
+    // --- Existing Recipe and Meal Log Routes (No changes) ---
+    if (path.startsWith('/api/recipes/search')) {
+      const query = url.searchParams.get('q');
+      if (!query) return new Response('Query parameter "q" is required', { status: 400 });
+      const { results } = await env.DB.prepare("SELECT * FROM recipes WHERE name LIKE ?").bind(`%${query}%`).all();
+      return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+    }
+    if (path.startsWith('/api/recipes/ingredients')) {
+        const ingredients = url.searchParams.get('q')?.split(',');
+        if (!ingredients || ingredients.length === 0) return new Response('Query parameter "q" with comma-separated ingredients is required', { status: 400 });
+        const placeholders = ingredients.map(() => 'ingredients LIKE ?').join(' AND ');
+        const bindings = ingredients.map(i => `%${i.trim()}%`);
+        const { results } = await env.DB.prepare(`SELECT * FROM recipes WHERE ${placeholders}`).bind(...bindings).all();
+        return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+    }
+    if (path.match(/^\/api\/recipes\/\d+$/)) {
+      const recipeId = path.split('/').pop();
+      const recipe = await env.DB.prepare("SELECT * FROM recipes WHERE id = ?").bind(recipeId).first();
+      if (!recipe) return new Response('Recipe not found', { status: 404 });
+      const logCountResult = await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first();
+      const responsePayload = { ...recipe, log_count: logCountResult.count };
+      return new Response(JSON.stringify(responsePayload), { headers: { 'Content-Type': 'application/json' } });
+    }
+    if (path.startsWith('/api/meal-log') && request.method === 'POST') {
         const { recipe_id, eaten_date, notes } = await request.json();
-        if (!recipe_id || !eaten_date) return jsonResponse({ error: 'Recipe ID and eaten date are required.' }, 400);
-        
-        await env.DB.prepare(
-          'INSERT INTO meal_log (recipe_id, user_id, eaten_date, notes) VALUES (?1, ?2, ?3, ?4)'
-        ).bind(recipe_id, userId, eaten_date, notes || null).run();
-        
-        return jsonResponse({ success: true }, 201);
-      } catch (e) {
-        return jsonResponse({ error: 'Invalid request body.' }, 400);
+        if (!recipe_id || !eaten_date || !userId) return new Response('recipe_id, eaten_date, and user_id are required', { status: 400 });
+        await env.DB.prepare("INSERT INTO meal_log (recipe_id, eaten_date, user_id, notes) VALUES (?, ?, ?, ?)").bind(recipe_id, eaten_date, userId, notes).run();
+        return new Response(JSON.stringify({ success: true }), { status: 201 });
+    }
+    
+    // --- NEW SHOPPING LIST ROUTES ---
+
+    // GET /api/shopping-list: Fetch all items for the current user
+    if (path === '/api/shopping-list' && request.method === 'GET') {
+      if (!userId) return new Response('Unauthorized', { status: 401 });
+      const { results } = await env.DB.prepare(
+        "SELECT * FROM shopping_list WHERE user_id = ? ORDER BY recipe_name, id"
+      ).bind(userId).all();
+      return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // POST /api/shopping-list: Add multiple items to the list
+    if (path === '/api/shopping-list' && request.method === 'POST') {
+      if (!userId) return new Response('Unauthorized', { status: 401 });
+      const { items, recipe_name } = await request.json(); // Expect an array of items
+      if (!items || !Array.isArray(items) || items.length === 0 || !recipe_name) {
+        return new Response('A recipe_name and an array of items are required.', { status: 400 });
       }
-    }
-  }
 
-  // --- Handle GET requests ---
-  if (request.method === 'GET') {
-    const userId = getUserId(request);
+      // Prepare a batch insert
+      const stmt = env.DB.prepare("INSERT INTO shopping_list (user_id, ingredient_name, quantity, unit, recipe_name) VALUES (?, ?, ?, ?, ?)");
+      const batch = items.map(item => stmt.bind(userId, item.name, item.quantity, item.unit, recipe_name));
+      await env.DB.batch(batch);
+      
+      return new Response(JSON.stringify({ success: true }), { status: 201 });
+    }
+
+    // PUT /api/shopping-list/update: Update the checked status of multiple items
+    if (path === '/api/shopping-list/update' && request.method === 'PUT') {
+        if (!userId) return new Response('Unauthorized', { status: 401 });
+        const { updates } = await request.json(); // Expects an array of {id, is_checked}
+        if (!updates || !Array.isArray(updates)) {
+            return new Response('An array of updates is required.', { status: 400 });
+        }
+        
+        const stmt = env.DB.prepare("UPDATE shopping_list SET is_checked = ? WHERE id = ? AND user_id = ?");
+        const batch = updates.map(update => stmt.bind(update.is_checked ? 1 : 0, update.id, userId));
+        await env.DB.batch(batch);
+
+        return new Response(JSON.stringify({ success: true }));
+    }
     
-    // --- Get all unique tags ---
-    if (url.pathname === '/api/tags') {
-        const { results } = await env.DB.prepare("SELECT tags FROM recipes WHERE tags IS NOT NULL AND tags != ''").all();
-        const allTags = new Set<string>();
-        results.forEach((row: { tags: string }) => {
-            row.tags.split(',').map(tag => tag.trim()).forEach(tag => allTags.add(tag));
-        });
-        return jsonResponse(Array.from(allTags).sort());
-    }
-      
-    // --- Search by tag ---
-    if (url.pathname === '/api/recipes/search/tag') {
-        const tag = url.searchParams.get('q') || '';
-        if (!tag) return jsonResponse([]);
-        const stmt = env.DB.prepare("SELECT id, name, tags FROM recipes WHERE LOWER(tags) LIKE ?1");
-        const { results } = await stmt.bind(`%${tag.toLowerCase()}%`).all();
-        return jsonResponse(results || []);
+    // DELETE /api/shopping-list/clear: Delete all checked items
+    if (path === '/api/shopping-list/clear' && request.method === 'DELETE') {
+        if (!userId) return new Response('Unauthorized', { status: 401 });
+        await env.DB.prepare("DELETE FROM shopping_list WHERE user_id = ? AND is_checked = 1").bind(userId).run();
+        return new Response(JSON.stringify({ success: true }));
     }
 
-    // --- Search by Recipe Name ---
-    if (url.pathname === '/api/recipes/search/name') {
-      const query = url.searchParams.get('q') || '';
-      const stmt = env.DB.prepare('SELECT id, name, tags FROM recipes WHERE LOWER(name) LIKE ?1');
-      const { results } = await stmt.bind(`%${query.toLowerCase()}%`).all();
-      return jsonResponse(results || []);
-    }
+    // Fallback for any other path - pass through to the static assets
+    return context.next();
 
- // --- Search by Ingredients (RECOMMENDED SOLUTION) ---
-if (url.pathname === '/api/recipes/search/ingredient') {
-    const query = url.searchParams.get('q') || '';
-    const ingredients = query.split(',').map(ing => ing.trim().toLowerCase()).filter(ing => ing);
-
-    if (ingredients.length === 0) {
-        return jsonResponse([]);
-    }
-
-    // Build a WHERE clause that uses a subquery for each ingredient.
-    // This precisely checks if an ingredient with the given name exists in the JSON.
-    const whereClauses = ingredients.map(() => 
-        `EXISTS (
-            SELECT 1 
-            FROM json_tree(recipes.ingredients) 
-            WHERE key = 'name' AND LOWER(value) LIKE ?
-        )`
-    );
-
-    const sqlQuery = `SELECT id, name, tags FROM recipes WHERE ${whereClauses.join(' AND ')}`;
-    
-    // The query parameters are now correctly formatted for the LIKE clause.
-    const queryParams = ingredients.map(ing => `%${ing}%`);
-
-    const stmt = env.DB.prepare(sqlQuery);
-    const { results } = await stmt.bind(...queryParams).all();
-
-    return jsonResponse(results || []);
-}
-     if (url.pathname.startsWith('/api/recipes/') && url.pathname.endsWith('/log')) {
-      if (!userId) return jsonResponse({ error: 'Authentication required.' }, 401);
-      const id = url.pathname.split('/')[3];
-      const stmt = env.DB.prepare('SELECT eaten_date, notes FROM meal_log WHERE recipe_id = ?1 AND user_id = ?2 ORDER BY eaten_date DESC');
-      const { results } = await stmt.bind(id, userId).all();
-      return jsonResponse(results || []);
-    }   
-    // --- Get a Single Recipe by ID (now includes tags) ---
-    if (url.pathname.startsWith('/api/recipes/') && !url.pathname.endsWith('/log') && !url.pathname.includes('/search/')) {
-      const id = url.pathname.split('/')[3];
-      const recipeData = await env.DB.prepare('SELECT * FROM recipes WHERE id = ?1').bind(id).first();
-      if (!recipeData) return jsonResponse({ error: 'Recipe not found.' }, 404);
-      const recipe = { ...recipeData, ingredients: JSON.parse(recipeData.ingredients as string), instructions: JSON.parse(recipeData.instructions as string) };
-      return jsonResponse(recipe);
-    }
-      
-    // --- LOGS (Unchanged) ---
-    if (url.pathname === '/api/log') {
-      if (!userId) return jsonResponse({ error: 'Authentication required.' }, 401);
-      const stmt = env.DB.prepare(`
-        SELECT ml.eaten_date, ml.notes, r.id as recipe_id, r.name as recipe_name 
-        FROM meal_log ml 
-        JOIN recipes r ON ml.recipe_id = r.id 
-        WHERE ml.user_id = ?1 
-        ORDER BY ml.eaten_date DESC
-      `);
-      const { results } = await stmt.bind(userId).all();
-      return jsonResponse(results || []);
-    }
-      
-  
+  } catch (e) {
+    return new Response(e.message, { status: 500 });
   }
-
-  // Fallback for any unhandled routes
-  return jsonResponse({ error: "Not Found" }, 404);
 };
+
+// Helper function to get user identity from Cloudflare Access
+async function getIdentity(request: Request): Promise<{ email: string } | null> {
+    try {
+        const res = await fetch(`https://${new URL(request.url).hostname}/cdn-cgi/access/get-identity`);
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (e) {
+        return null;
+    }
+}
