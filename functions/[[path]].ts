@@ -110,23 +110,29 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return context.next();
 
   } catch (e) {
-    return new Response(e.message, { status: 500 });
+    console.error("Caught error in onRequest handler:", e);
+    return new Response('Internal Server Error', { status: 500 });
   }
 };
 
 // Helper function to get user identity from Cloudflare Access
 async function getIdentity(request: Request): Promise<{ email: string } | null> {
     try {
-        // CORRECTED: Pass the cookie from the original request to the identity endpoint
         const identityUrl = `https://${new URL(request.url).hostname}/cdn-cgi/access/get-identity`;
         const headers = new Headers();
         headers.set('cookie', request.headers.get('cookie') || '');
         
         const res = await fetch(identityUrl, { headers });
 
-        if (!res.ok) return null;
+        if (!res.ok) {
+            console.error(`getIdentity failed with status: ${res.status} ${res.statusText}`);
+            const errorText = await res.text();
+            console.error(`getIdentity error response: ${errorText}`);
+            return null;
+        }
         return await res.json();
     } catch (e) {
+        console.error("Critical error in getIdentity fetch:", e);
         return null;
     }
 }
