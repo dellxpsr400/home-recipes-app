@@ -112,22 +112,46 @@
                 const response = await fetch(`/api/recipes/${recipeId}`);
                 const recipe = await response.json();
                 recipeModalTitle.textContent = recipe.name;
-                const ingredientsHtml = recipe.ingredients.split('\n').map(ing => {
-                    const [quantity, unit, ...nameParts] = ing.trim().split(' ');
-                    const name = nameParts.join(' ');
-                    return `<li class="flex items-center">
-                                <input type="checkbox" class="mr-3 h-5 w-5 ingredient-checkbox" data-name="${name}" data-quantity="${quantity}" data-unit="${unit}">
-                                <span>${ing}</span>
+
+                // --- MODIFIED: JSON Parsing for Ingredients ---
+                let ingredientsHtml = '';
+                try {
+                    const ingredientsData = JSON.parse(recipe.ingredients);
+                    ingredientsData.forEach(section => {
+                        ingredientsHtml += `<h5 class="font-semibold mt-2">${section.section_title}</h5>`;
+                        const itemsHtml = section.items.map(ing => {
+                            const fullText = `${ing.quantity} ${ing.name} ${ing.notes || ''}`.trim();
+                             return `<li class="flex items-center">
+                                <input type="checkbox" class="mr-3 h-5 w-5 ingredient-checkbox" data-name="${ing.name}" data-quantity="${ing.quantity}" data-unit="">
+                                <span>${fullText}</span>
                             </li>`;
-                }).join('');
+                        }).join('');
+                        ingredientsHtml += `<ul class="list-disc list-inside">${itemsHtml}</ul>`;
+                    });
+                } catch (e) {
+                    // Fallback for plain text
+                    ingredientsHtml = `<p>${recipe.ingredients}</p>`;
+                }
+
+                // --- MODIFIED: JSON Parsing for Instructions ---
+                let instructionsHtml = '';
+                try {
+                    const instructionsData = JSON.parse(recipe.instructions);
+                    const itemsHtml = instructionsData.map(step => `<li>${step}</li>`).join('');
+                    instructionsHtml = `<ol class="list-decimal list-inside">${itemsHtml}</ol>`;
+                } catch (e) {
+                     // Fallback for plain text
+                    instructionsHtml = `<p class="whitespace-pre-wrap">${recipe.instructions}</p>`;
+                }
+
                 recipeModalContent.innerHTML = `
                     <h4 class="font-bold mt-4">Ingredients:</h4>
-                    <ul class="list-disc list-inside">${ingredientsHtml}</ul>
+                    ${ingredientsHtml}
                     <div class="text-right mt-4">
                         <button id="add-to-list-btn" data-recipe-name="${recipe.name}" class="bg-green-500 text-white p-2 rounded">Add Selected to Shopping List</button>
                     </div>
                     <h4 class="font-bold mt-4">Instructions:</h4>
-                    <p class="whitespace-pre-wrap">${recipe.instructions}</p>
+                    ${instructionsHtml}
                     <h4 class="font-bold mt-4">Meal Log:</h4>
                     <p>You have logged this meal ${recipe.log_count} time(s).</p>
                     <div class="mt-4">
@@ -206,7 +230,7 @@
                     const itemsHtml = groupedByRecipe[recipeName].map(item => `
                         <li class="flex items-center ml-4">
                             <input type="checkbox" data-id="${item.id}" class="mr-3 h-5 w-5 shopping-item-checkbox" ${item.is_checked ? 'checked' : ''}>
-                            <span class="${item.is_checked ? 'checked-item' : ''}">${item.quantity} ${item.unit} ${item.ingredient_name}</span>
+                            <span class="${item.is_checked ? 'checked-item' : ''}">${item.quantity} ${item.unit || ''} ${item.ingredient_name}</span>
                         </li>
                     `).join('');
                     recipeGroup.innerHTML = `<h4 class="font-bold text-lg">${recipeName}</h4><ul class="list-none">${itemsHtml}</ul>`;
