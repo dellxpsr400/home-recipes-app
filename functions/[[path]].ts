@@ -1,5 +1,4 @@
 // functions/[[path]].ts
-// v3 to fix the logic
 
 interface Env {
   DB: D1Database;
