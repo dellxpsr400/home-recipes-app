@@ -1,334 +1,262 @@
+<!-- public/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Recipes</title>
+    <title>Home Recipes App</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; min-height: 100vh; }
-        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #555; }
-        #recipeModal, #loader { transition: opacity 0.3s ease; }
-        .view-hidden { display: none !important; }
+        .modal { transition: opacity 0.25s ease; }
+        body.modal-active { overflow: hidden; }
+        .checked-item { text-decoration: line-through; color: #9ca3af; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-800">
+<body class="bg-gray-100">
 
-    <!-- Main container -->
-    <div class="container mx-auto p-4 md:p-6 max-w-4xl">
-
-        <!-- Header Section -->
-        <header class="text-center mb-6 border-b pb-4">
-            <div class="flex justify-between items-center mb-2">
-                 <button id="showSearchBtn" class="text-blue-600 font-semibold hover:underline disabled:text-gray-400 disabled:no-underline" disabled>Recipe Search</button>
-                 <button id="showLogBtn" class="text-blue-600 font-semibold hover:underline disabled:text-gray-400 disabled:no-underline">Meal Log</button>
+    <div class="container mx-auto p-4">
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <div class="flex justify-between items-center mb-4">
+                <h1 class="text-3xl font-bold text-gray-800">Recipe Finder</h1>
+                <div>
+                    <span id="user-greeting" class="text-gray-600 mr-4"></span>
+                    <button id="shopping-list-button" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                        Shopping List
+                    </button>
+                </div>
             </div>
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">My Home Recipes (github)</h1>
-            <p id="userEmail" class="text-gray-500 text-sm mt-2 h-5"></p>
-        </header>
-
-        <!-- Search View -->
-        <div id="searchView">
-            <main>
-                 <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-6">
-                    <h2 class="text-xl md:text-2xl font-semibold mb-4">Filter by Category</h2>
-                    <div id="tagsContainer" class="flex flex-wrap gap-2"></div>
-                </div>
-                <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-4">
-                    <h2 class="text-xl md:text-2xl font-semibold mb-3">Search by Recipe Name</h2>
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="text" id="nameSearchInput" placeholder="e.g., 'Cashew Pie'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition">
-                        <button id="nameSearchBtn" class="bg-blue-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-blue-700 transition shadow">Search</button>
-                    </div>
-                </div>
-                <div class="bg-white p-4 md:p-6 rounded-xl shadow-md mb-6">
-                    <h2 class="text-xl md:text-2xl font-semibold mb-3">Search by Ingredients</h2>
-                    <p class="text-gray-500 mb-3 text-sm">Enter one or more ingredients, separated by commas.</p>
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="text" id="ingredientSearchInput" placeholder="e.g., 'tomatoes, garlic'" class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none transition">
-                        <button id="ingredientSearchBtn" class="bg-green-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-green-700 transition shadow">Search</button>
-                    </div>
-                </div>
-                <div class="flex justify-between items-center mb-4">
-                    <h3 id="resultsHeader" class="text-lg font-semibold text-gray-700">&nbsp;</h3>
-                    <button id="clearSearchBtn" class="bg-gray-500 text-white font-semibold px-4 py-2 rounded-lg hover:bg-gray-600 transition shadow-sm text-sm">Clear Search</button>
-                </div>
-                <div id="resultsContainer" class="space-y-4"></div>
-            </main>
+            <div class="flex space-x-4 mb-4">
+                <input type="text" id="search-by-name" placeholder="Search by recipe name..." class="p-2 border border-gray-300 rounded-md w-1/2">
+                <input type="text" id="search-by-ingredients" placeholder="Search by ingredients (e.g., chicken, tomato)..." class="p-2 border border-gray-300 rounded-md w-1/2">
+            </div>
+            <div id="search-results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
         </div>
-
-        <!-- Meal Log View -->
-        <div id="logView" class="view-hidden">
-             <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Your Meal History</h2>
-             <div id="logContainer" class="space-y-3"></div>
-        </div>
-
     </div>
 
     <!-- Recipe Details Modal -->
-    <div id="recipeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
-        <div id="modalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
-                <h2 id="modalRecipeName" class="text-2xl md:text-3xl font-bold">&nbsp;</h2>
-                <button id="closeModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl">&times;</button>
-            </div>
-            <div id="modalBody" class="p-6 overflow-y-auto custom-scrollbar">
-                <div id="logMealSection" class="bg-blue-50 p-4 rounded-lg mb-6">
-                    <h3 class="text-xl font-semibold mb-3">Log this Meal</h3>
-                    <div class="flex flex-col sm:flex-row gap-3 items-center">
-                        <input type="date" id="logDateInput" class="p-2 border rounded-lg flex-grow w-full sm:w-auto">
-                        <button id="saveLogBtn" class="bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition w-full sm:w-auto">Save to Log</button>
+    <div id="recipe-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        <div class="modal-container bg-white w-11/12 md:max-w-2xl mx-auto rounded shadow-lg z-50 overflow-y-auto" style="max-height: 90vh;">
+            <div class="modal-content py-4 text-left px-6">
+                <div class="flex justify-between items-center pb-3">
+                    <p id="recipe-modal-title" class="text-2xl font-bold"></p>
+                    <div class="modal-close cursor-pointer z-50">
+                        <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
                     </div>
-                    <p id="logStatusMsg" class="text-sm text-green-700 mt-2 h-4"></p>
                 </div>
-                <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-3">Your History for this Recipe</h3>
-                    <ul id="modalLogHistory" class="list-disc list-inside space-y-1 text-gray-600"></ul>
-                </div>
-                <div class="mb-6">
-                    <h3 class="text-xl font-semibold mb-3">Ingredients</h3>
-                    <div id="modalIngredientsContainer"></div>
-                </div>
-                <div>
-                    <h3 class="text-xl font-semibold mb-3">Instructions</h3>
-                    <ol id="modalInstructions" class="list-decimal list-inside space-y-3"></ol>
-                </div>
+                <div id="recipe-modal-content" class="text-gray-700"></div>
             </div>
         </div>
     </div>
     
-    <div id="loader" class="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center hidden z-50">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
+    <!-- Shopping List Modal -->
+    <div id="shopping-list-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        <div class="modal-container bg-white w-11/12 md:max-w-lg mx-auto rounded shadow-lg z-50 overflow-y-auto" style="max-height: 90vh;">
+            <div class="modal-content py-4 text-left px-6">
+                <div class="flex justify-between items-center pb-3">
+                    <p class="text-2xl font-bold">Shopping List</p>
+                    <div class="modal-close cursor-pointer z-50">
+                         <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
+                    </div>
+                </div>
+                <div id="shopping-list-content" class="space-y-4"></div>
+                <div class="flex justify-end mt-4 space-x-2">
+                    <button id="update-checked-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Update List</button>
+                    <button id="clear-checked-items-btn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Clear Checked Items</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        let currentRecipeId = null;
-
-        const getEl = (id) => document.getElementById(id);
-
-        const apiRequest = async (endpoint, options = {}) => {
-            getEl('loader').classList.remove('hidden');
+        document.addEventListener('DOMContentLoaded', async function () {
+            // --- User Info ---
+            const userGreeting = document.getElementById('user-greeting');
             try {
-                const response = await fetch(endpoint, options);
-                if (!response.ok) throw new Error(`API Error: ${response.status}`);
-                if (response.headers.get("content-type")?.includes("application/json")) return response.json();
-                return null;
-            } catch (error) {
-                console.error(`API request failed:`, error);
-                throw error;
-            } finally {
-                getEl('loader').classList.add('hidden');
-            }
-        };
-        
-        const renderTags = (tags) => {
-            const container = getEl('tagsContainer');
-            if (!container) return;
-            container.innerHTML = '';
-            tags.forEach(tag => {
-                const button = document.createElement('button');
-                button.className = 'px-3 py-1 bg-gray-200 text-gray-700 rounded-full text-sm font-semibold hover:bg-gray-300 transition';
-                button.textContent = tag;
-                button.addEventListener('click', () => search('/api/recipes/search/tag', tag));
-                container.appendChild(button);
-            });
-        };
+                const identityRes = await fetch('/cdn-cgi/access/get-identity');
+                if (identityRes.ok) {
+                    const identity = await identityRes.json();
+                    userGreeting.textContent = `Hello, ${identity.email}!`;
+                } else { userGreeting.textContent = 'Welcome!'; }
+            } catch (e) { userGreeting.textContent = 'Welcome!'; }
 
-        const renderResults = (results) => {
-            const container = getEl('resultsContainer');
-            const header = getEl('resultsHeader');
-            container.innerHTML = '';
-            header.textContent = `Found ${results?.length || 0} recipe(s).`;
-            if (!results || results.length === 0) {
-                container.innerHTML = '<div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-sm"><p>Try a different search term.</p></div>';
-                return;
+            // --- Search Functionality ---
+            const searchByNameInput = document.getElementById('search-by-name');
+            const searchByIngredientsInput = document.getElementById('search-by-ingredients');
+            const searchResultsContainer = document.getElementById('search-results');
+            searchByNameInput.addEventListener('input', debounce(() => searchRecipes('name', searchByNameInput.value), 300));
+            searchByIngredientsInput.addEventListener('input', debounce(() => searchRecipes('ingredients', searchByIngredientsInput.value), 300));
+
+            async function searchRecipes(type, query) {
+                if (query.length < 3) { searchResultsContainer.innerHTML = ''; return; }
+                const endpoint = type === 'name' ? `/api/recipes/search?q=${query}` : `/api/recipes/ingredients?q=${query}`;
+                const response = await fetch(endpoint);
+                const recipes = await response.json();
+                searchResultsContainer.innerHTML = recipes.length === 0 ? '<p class="text-gray-500">No recipes found.</p>' : '';
+                recipes.forEach(recipe => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-gray-200 p-4 rounded-lg shadow cursor-pointer hover:bg-gray-300';
+                    card.innerHTML = `<h3 class="font-bold text-lg">${recipe.name}</h3>`;
+                    card.addEventListener('click', () => showRecipeDetails(recipe.id));
+                    searchResultsContainer.appendChild(card);
+                });
             }
-            results.forEach(recipe => {
-                const card = document.createElement('div');
-                card.className = 'bg-white p-5 rounded-xl shadow-md';
-                let tagsHTML = '';
-                if(recipe.tags) {
-                    tagsHTML = `<div class="flex flex-wrap gap-2 mt-2">` +
-                               recipe.tags.split(',').map(t => `<span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs">${t.trim()}</span>`).join('') +
-                               `</div>`;
-                }
-                card.innerHTML = `<div class="cursor-pointer" onclick="showRecipeDetails(${recipe.id})">
-                                    <span class="text-sm font-semibold text-blue-600">Recipe #${recipe.id}</span>
-                                    <h3 class="text-xl font-bold text-gray-800">${recipe.name}</h3>
-                                    ${tagsHTML}
-                                  </div>`;
-                container.appendChild(card);
-            });
-        };
-        
-        const fetchAndRenderFullLog = async () => {
-            try {
-                const logs = await apiRequest('/api/log');
-                const container = getEl('logContainer');
-                container.innerHTML = '';
-                if (!logs || logs.length === 0) {
-                    container.innerHTML = "<p class='text-center text-gray-500'>You haven't logged any meals yet.</p>";
+
+            // --- Recipe Modal ---
+            const recipeModal = document.getElementById('recipe-modal');
+            const recipeModalTitle = document.getElementById('recipe-modal-title');
+            const recipeModalContent = document.getElementById('recipe-modal-content');
+            
+            async function showRecipeDetails(recipeId) {
+                const response = await fetch(`/api/recipes/${recipeId}`);
+                const recipe = await response.json();
+                recipeModalTitle.textContent = recipe.name;
+                const ingredientsHtml = recipe.ingredients.split('\n').map(ing => {
+                    const [quantity, unit, ...nameParts] = ing.trim().split(' ');
+                    const name = nameParts.join(' ');
+                    return `<li class="flex items-center">
+                                <input type="checkbox" class="mr-3 h-5 w-5 ingredient-checkbox" data-name="${name}" data-quantity="${quantity}" data-unit="${unit}">
+                                <span>${ing}</span>
+                            </li>`;
+                }).join('');
+                recipeModalContent.innerHTML = `
+                    <h4 class="font-bold mt-4">Ingredients:</h4>
+                    <ul class="list-disc list-inside">${ingredientsHtml}</ul>
+                    <div class="text-right mt-4">
+                        <button id="add-to-list-btn" data-recipe-name="${recipe.name}" class="bg-green-500 text-white p-2 rounded">Add Selected to Shopping List</button>
+                    </div>
+                    <h4 class="font-bold mt-4">Instructions:</h4>
+                    <p class="whitespace-pre-wrap">${recipe.instructions}</p>
+                    <h4 class="font-bold mt-4">Meal Log:</h4>
+                    <p>You have logged this meal ${recipe.log_count} time(s).</p>
+                    <div class="mt-4">
+                        <label for="eaten-date">Log this meal:</label>
+                        <input type="date" id="eaten-date" class="border p-1 rounded">
+                        <button id="log-meal-btn" data-recipe-id="${recipe.id}" class="bg-blue-500 text-white p-2 rounded ml-2">Log Meal</button>
+                    </div>`;
+                toggleModal(recipeModal, true);
+                
+                document.getElementById('add-to-list-btn').addEventListener('click', handleAddToList);
+                document.getElementById('log-meal-btn').addEventListener('click', handleLogMeal);
+            }
+            
+            async function handleAddToList(e) {
+                const recipeName = e.target.dataset.recipeName;
+                const selectedCheckboxes = document.querySelectorAll('.ingredient-checkbox:checked');
+                if (selectedCheckboxes.length === 0) {
+                    alert('Please select at least one ingredient to add.');
                     return;
                 }
-                logs.forEach(log => {
-                    const date = new Date(log.eaten_date + 'T00:00:00');
-                    const formattedDate = date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-                    const logEntry = document.createElement('div');
-                    logEntry.className = 'bg-white p-4 rounded-lg shadow-sm';
-                    logEntry.innerHTML = `<p class="text-gray-800"><span class="font-bold">${formattedDate}:</span> You ate <a href="#" data-recipe-id="${log.recipe_id}" class="text-blue-600 font-semibold hover:underline">${log.recipe_name}</a>.</p>${log.notes ? `<p class="text-sm text-gray-500 mt-1 pl-4"><em>Note: ${log.notes}</em></p>` : ''}`;
-                    container.appendChild(logEntry);
-                });
-            } catch (error) {
-                getEl('logContainer').innerHTML = '<p class="text-center text-red-500">Could not load meal history.</p>';
-            }
-        };
-
-        const switchView = (view) => {
-            getEl('searchView').classList.toggle('view-hidden', view !== 'search');
-            getEl('logView').classList.toggle('view-hidden', view !== 'log');
-            getEl('showSearchBtn').disabled = view === 'search';
-            getEl('showLogBtn').disabled = view === 'log';
-            if (view === 'log') fetchAndRenderFullLog();
-        };
-
-        const search = async (endpoint, query) => {
-            if (!query.trim()) return;
-            try {
-                const results = await apiRequest(`${endpoint}?q=${encodeURIComponent(query.trim())}`);
-                renderResults(results);
-            } catch (error) { 
-                getEl('resultsHeader').textContent = 'Search Error';
-                getEl('resultsContainer').innerHTML = '<div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-lg shadow-sm"><p>Could not fetch recipes.</p></div>';
-            }
-        };
-
-        window.showRecipeDetails = async (recipeId) => {
-            currentRecipeId = recipeId;
-            try {
-                const recipe = await apiRequest(`/api/recipes/${recipeId}`);
-                getEl('modalRecipeName').textContent = recipe.name;
+                const items = Array.from(selectedCheckboxes).map(cb => ({
+                    name: cb.dataset.name,
+                    quantity: cb.dataset.quantity,
+                    unit: cb.dataset.unit,
+                }));
                 
-                const ingredientsContainer = getEl('modalIngredientsContainer');
-                ingredientsContainer.innerHTML = ''; 
-                
-                if (Array.isArray(recipe.ingredients)) {
-                    recipe.ingredients.forEach(section => {
-                        if (section.section_title) {
-                            const sectionTitle = document.createElement('h4');
-                            sectionTitle.className = 'font-semibold text-lg mt-4 mb-2';
-                            sectionTitle.textContent = section.section_title;
-                            ingredientsContainer.appendChild(sectionTitle);
-                        }
-
-                        const itemList = document.createElement('ul');
-                        itemList.className = 'list-disc list-inside space-y-2';
-                        if (Array.isArray(section.items)) {
-                            section.items.forEach(ing => {
-                                const itemEl = document.createElement('li');
-                                itemEl.innerHTML = `<span class="font-semibold">${ing.quantity} ${ing.name}</span> ${ing.notes ? `<em>(${ing.notes})</em>` : ''}`;
-                                itemList.appendChild(itemEl);
-                            });
-                        }
-                        ingredientsContainer.appendChild(itemList);
-                    });
-                }
-
-                getEl('modalInstructions').innerHTML = recipe.instructions.map(step => `<li>${step}</li>`).join('');
-                await renderModalLogHistory(recipeId);
-                getEl('recipeModal').classList.remove('hidden');
-                document.body.style.overflow = 'hidden';
-            } catch (error) { 
-                console.error("Error showing recipe details:", error);
-                alert('Could not load recipe details.'); 
-            }
-        };
-
-        const renderModalLogHistory = async (recipeId) => {
-            const historyEl = getEl('modalLogHistory');
-            try {
-                const logs = await apiRequest(`/api/recipes/${recipeId}/log`);
-                historyEl.innerHTML = (!logs || logs.length === 0)
-                    ? "<li>You haven't logged this meal yet.</li>"
-                    : logs.map(log => {
-                        const date = new Date(log.eaten_date + 'T00:00:00');
-                        return `<li>${date.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })}</li>`;
-                    }).join('');
-            } catch (e) {
-                historyEl.innerHTML = '<li>Could not load history.</li>';
-            }
-        };
-
-        const hideModal = () => {
-            getEl('recipeModal').classList.add('hidden');
-            document.body.style.overflow = '';
-            currentRecipeId = null;
-        };
-        
-        const saveLog = async () => {
-            const eaten_date = getEl('logDateInput').value;
-            if (!eaten_date || !currentRecipeId) return;
-            const msgEl = getEl('logStatusMsg');
-            msgEl.textContent = 'Saving...';
-            try {
-                await apiRequest('/api/log', {
+                await fetch('/api/shopping-list', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ recipe_id: currentRecipeId, eaten_date, notes: '' })
+                    body: JSON.stringify({ items, recipe_name: recipeName }),
                 });
-                msgEl.textContent = 'Saved successfully!';
-                await renderModalLogHistory(currentRecipeId);
-                setTimeout(() => { msgEl.textContent = ''; }, 2000);
-            } catch (error) {
-                msgEl.textContent = 'Failed to save.';
+                alert(`${items.length} item(s) added to your shopping list!`);
+                toggleModal(recipeModal, false);
             }
-        };
 
-        // --- Event Listeners & Initial Load ---
-        getEl('showSearchBtn').addEventListener('click', () => switchView('search'));
-        getEl('showLogBtn').addEventListener('click', () => switchView('log'));
-        getEl('nameSearchBtn').addEventListener('click', () => search('/api/recipes/search/name', getEl('nameSearchInput').value));
-        getEl('ingredientSearchBtn').addEventListener('click', () => search('/api/recipes/search/ingredient', getEl('ingredientSearchInput').value));
-        getEl('clearSearchBtn').addEventListener('click', () => {
-            getEl('nameSearchInput').value = '';
-            getEl('ingredientSearchInput').value = '';
-            getEl('resultsContainer').innerHTML = '';
-            getEl('resultsHeader').textContent = '';
-        });
-        getEl('nameSearchInput').addEventListener('keyup', e => { if (e.key === 'Enter') search('/api/recipes/search/name', e.target.value); });
-        getEl('ingredientSearchInput').addEventListener('keyup', e => { if (e.key === 'Enter') search('/api/recipes/search/ingredient', e.target.value); });
-        getEl('closeModalBtn').addEventListener('click', hideModal);
-        getEl('recipeModal').addEventListener('click', e => { if (e.target.id === 'recipeModal') hideModal(); });
-        getEl('saveLogBtn').addEventListener('click', saveLog);
-        
-        document.body.addEventListener('click', e => {
-            const link = e.target.closest('#logContainer a[data-recipe-id]');
-            if (link) {
-                e.preventDefault();
-                showRecipeDetails(link.dataset.recipeId);
+            async function handleLogMeal(e) {
+                const recipeId = e.target.dataset.recipeId;
+                const eatenDate = document.getElementById('eaten-date').value;
+                if (!eatenDate) { alert('Please select a date.'); return; }
+                await fetch('/api/meal-log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipe_id: recipeId, eaten_date: eatenDate, notes: '' }),
+                });
+                alert('Meal logged successfully!');
+                toggleModal(recipeModal, false);
             }
-        });
 
-        getEl('logDateInput').valueAsDate = new Date();
-        
-        apiRequest('/api/tags').then(renderTags).catch(err => console.error("Failed to load tags", err));
-        
-        apiRequest('/cdn-cgi/access/get-identity')
-            .then(identity => {
-                if (identity && identity.email) {
-                    getEl('userEmail').textContent = 'Logged in as: ' + identity.email;
+            // --- Shopping List Modal & Functionality ---
+            const shoppingListModal = document.getElementById('shopping-list-modal');
+            const shoppingListButton = document.getElementById('shopping-list-button');
+            const shoppingListContent = document.getElementById('shopping-list-content');
+            
+            shoppingListButton.addEventListener('click', showShoppingList);
+
+            async function showShoppingList() {
+                const response = await fetch('/api/shopping-list');
+                const items = await response.json();
+                renderShoppingList(items);
+                toggleModal(shoppingListModal, true);
+            }
+
+            function renderShoppingList(items) {
+                shoppingListContent.innerHTML = '';
+                if (items.length === 0) {
+                    shoppingListContent.innerHTML = '<p class="text-gray-500">Your shopping list is empty.</p>';
+                    return;
                 }
-            })
-            .catch(() => {
-                getEl('userEmail').textContent = 'Not logged in (this is normal for local testing).';
+                const groupedByRecipe = items.reduce((acc, item) => {
+                    (acc[item.recipe_name] = acc[item.recipe_name] || []).push(item);
+                    return acc;
+                }, {});
+
+                for (const recipeName in groupedByRecipe) {
+                    const recipeGroup = document.createElement('div');
+                    const itemsHtml = groupedByRecipe[recipeName].map(item => `
+                        <li class="flex items-center ml-4">
+                            <input type="checkbox" data-id="${item.id}" class="mr-3 h-5 w-5 shopping-item-checkbox" ${item.is_checked ? 'checked' : ''}>
+                            <span class="${item.is_checked ? 'checked-item' : ''}">${item.quantity} ${item.unit} ${item.ingredient_name}</span>
+                        </li>
+                    `).join('');
+                    recipeGroup.innerHTML = `<h4 class="font-bold text-lg">${recipeName}</h4><ul class="list-none">${itemsHtml}</ul>`;
+                    shoppingListContent.appendChild(recipeGroup);
+                }
+            }
+            
+            document.getElementById('update-checked-btn').addEventListener('click', async () => {
+                const checkboxes = document.querySelectorAll('.shopping-item-checkbox');
+                const updates = Array.from(checkboxes).map(cb => ({
+                    id: cb.dataset.id,
+                    is_checked: cb.checked,
+                }));
+                await fetch('/api/shopping-list/update', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ updates }),
+                });
+                alert('List updated!');
+                await showShoppingList();
             });
-    });
+
+            document.getElementById('clear-checked-items-btn').addEventListener('click', async () => {
+                if (confirm('Are you sure you want to clear all checked items?')) {
+                    await fetch('/api/shopping-list/clear', { method: 'DELETE' });
+                    await showShoppingList();
+                }
+            });
+
+            // --- Generic Modal Logic ---
+            const closeButtons = document.querySelectorAll('.modal-close, .modal-overlay');
+            closeButtons.forEach(button => button.addEventListener('click', () => {
+                toggleModal(recipeModal, false);
+                toggleModal(shoppingListModal, false);
+            }));
+            function toggleModal(modal, show) {
+                modal.classList.toggle('opacity-0', !show);
+                modal.classList.toggle('pointer-events-none', !show);
+                document.body.classList.toggle('modal-active', show);
+            }
+
+            // --- Utilities ---
+            function debounce(func, wait) {
+                let timeout;
+                return (...args) => {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(this, args), wait);
+                };
+            }
+        });
     </script>
 </body>
 </html>
