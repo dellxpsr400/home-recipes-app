@@ -1,4 +1,5 @@
 // functions/[[path]].ts
+// v3 to fix the logic
 
 interface Env {
   DB: D1Database;
@@ -27,29 +28,36 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
     
-    // --- SECURE API ROUTES (Login required) ---
-
-    // Get user identity from the Access JWT. This is the security gate.
-    const identity = await getIdentity(request);
-    if (!identity) {
-        // If the request is for any other API route and there's no identity, deny access.
-        if (path.startsWith('/api/')) {
-            return new Response('Unauthorized: User identity could not be determined.', { status: 401 });
-        }
-        // If it's not an API route, let it pass through to be handled by Pages (which will trigger the login screen).
-        return context.next();
-    }
-    const userId = identity.email;
-
-    // Get a single recipe by ID (now secure, as it includes user-specific meal log data)
+    // Get a single recipe by ID (publicly accessible, with extra data for logged-in users)
     if (path.match(/^\/api\/recipes\/\d+$/)) {
       const recipeId = path.split('/').pop();
       const recipe = await env.DB.prepare("SELECT * FROM recipes WHERE id = ?").bind(recipeId).first();
       if (!recipe) return new Response('Recipe not found', { status: 404 });
-      const logCountResult = await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first();
-      const responsePayload = { ...recipe, log_count: logCountResult.count };
+
+      // Now, TRY to get user-specific data
+      let logCount = 0;
+      const identity = await getIdentity(request);
+      if (identity) {
+          const userId = identity.email;
+          const logCountResult = await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first();
+          logCount = logCountResult.count as number;
+      }
+      
+      const responsePayload = { ...recipe, log_count: logCount };
       return new Response(JSON.stringify(responsePayload), { headers: { 'Content-Type': 'application/json' } });
     }
+    
+    // --- SECURE API ROUTES (Login required) ---
+
+    // Get user identity from the Access JWT. This is the security gate for all subsequent routes.
+    const identity = await getIdentity(request);
+    if (!identity) {
+        if (path.startsWith('/api/')) {
+            return new Response('Unauthorized: User identity could not be determined.', { status: 401 });
+        }
+        return context.next();
+    }
+    const userId = identity.email;
     
     // Add a meal log entry
     if (path.startsWith('/api/meal-log') && request.method === 'POST') {
