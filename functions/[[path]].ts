@@ -117,7 +117,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 // Helper function to get user identity from Cloudflare Access
 async function getIdentity(request: Request): Promise<{ email: string } | null> {
     try {
-        const res = await fetch(`https://${new URL(request.url).hostname}/cdn-cgi/access/get-identity`);
+        // CORRECTED: Pass the cookie from the original request to the identity endpoint
+        const identityUrl = `https://${new URL(request.url).hostname}/cdn-cgi/access/get-identity`;
+        const headers = new Headers();
+        headers.set('cookie', request.headers.get('cookie') || '');
+        
+        const res = await fetch(identityUrl, { headers });
+
         if (!res.ok) return null;
         return await res.json();
     } catch (e) {
