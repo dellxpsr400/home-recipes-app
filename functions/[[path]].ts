@@ -83,7 +83,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return new Response('A recipe_name and an array of items are required.', { status: 400 });
       }
       const stmt = env.DB.prepare("INSERT INTO shopping_list (user_id, ingredient_name, quantity, unit, recipe_name) VALUES (?, ?, ?, ?, ?)");
-      const batch = items.map(item => stmt.bind(userId, item.name, item.quantity, item.unit, recipe_name));
+      const batch = items.map(item => {
+    const unitValue = item.unit || ''; // Use an empty string if unit is not provided
+    return stmt.bind(userId, item.name, item.quantity, unitValue, recipe_name);
+});
       await env.DB.batch(batch);
       return new Response(JSON.stringify({ success: true }), { status: 201 });
     }
