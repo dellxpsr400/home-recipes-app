@@ -1,0 +1,9 @@
+
+
+git status
+
+git add .
+
+git commit -m "Fix(DB): Add missing is_checked column to shopping_list schema"
+
+git push
