@@ -10,34 +10,29 @@
         .modal { transition: opacity 0.25s ease; }
         body.modal-active { overflow: hidden; }
         .checked-item { text-decoration: line-through; color: #9ca3af; }
-        
-        /* Toast Notification Styles */
-        #toast-notification {
+        .toast {
             position: fixed;
             bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 20px;
+            padding: 12px 24px;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             color: white;
-            z-index: 100;
             opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+            z-index: 1000;
         }
-        #toast-notification.show {
+        .toast.show {
             opacity: 1;
-            visibility: visible;
-            transform: translate(-50%, -10px);
+            transform: translateX(-50%) translateY(-20px);
         }
-        #toast-notification.bg-green-500 { background-color: #22c55e; }
-        #toast-notification.bg-blue-500 { background-color: #3b82f6; }
-        #toast-notification.bg-red-500 { background-color: #ef4444; }
-
+        .toast.success { background-color: #28a745; }
+        .toast.error { background-color: #dc3545; }
     </style>
 </head>
 <body class="bg-gray-100">
+
+    <div id="toast-notification" class="toast"></div>
 
     <div class="container mx-auto p-4">
         <div class="bg-white p-6 rounded-lg shadow-lg">
@@ -54,13 +49,15 @@
                 <input type="text" id="search-by-name" placeholder="Search by recipe name..." class="p-2 border border-gray-300 rounded-md w-1/2">
                 <input type="text" id="search-by-ingredients" placeholder="Search by ingredients (e.g., chicken, tomato)..." class="p-2 border border-gray-300 rounded-md w-1/2">
             </div>
-            <!-- Tags Panel -->
-            <div id="tags-panel" class="mb-4">
-                <h3 class="text-lg font-semibold text-gray-700 mb-2">Filter by Tag</h3>
+
+            <!-- Tags Section -->
+            <div class="mb-4">
+                <h3 class="font-bold text-lg mb-2">Filter by Tag:</h3>
                 <div id="tags-container" class="flex flex-wrap gap-2">
-                    <!-- Tags will be dynamically inserted here by JavaScript -->
+                    <!-- Tag buttons will be dynamically inserted here -->
                 </div>
             </div>
+
             <div id="search-results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
         </div>
     </div>
@@ -101,24 +98,8 @@
         </div>
     </div>
 
-    <!-- Toast Notification Element -->
-    <div id="toast-notification" role="alert"></div>
-
     <script>
         document.addEventListener('DOMContentLoaded', async function () {
-            // --- Toast Notification Logic ---
-            const toast = document.getElementById('toast-notification');
-            let toastTimeout;
-            function showToast(message, colorClass = 'bg-blue-500') {
-                clearTimeout(toastTimeout);
-                toast.textContent = message;
-                toast.className = ''; // Clear previous color classes
-                toast.classList.add(colorClass, 'show');
-                toastTimeout = setTimeout(() => {
-                    toast.classList.remove('show');
-                }, 3000); // Hide after 3 seconds
-            }
-
             // --- User Info ---
             const userGreeting = document.getElementById('user-greeting');
             try {
@@ -129,6 +110,26 @@
                 } else { userGreeting.textContent = 'Welcome!'; }
             } catch (e) { userGreeting.textContent = 'Welcome!'; }
 
+            // --- NEW: Load and Display Tags ---
+            const tagsContainer = document.getElementById('tags-container');
+            async function loadAndDisplayTags() {
+                try {
+                    const response = await fetch('/api/tags');
+                    const tags = await response.json();
+                    tagsContainer.innerHTML = ''; // Clear existing tags
+                    tags.sort().forEach(tag => {
+                        const button = document.createElement('button');
+                        button.textContent = tag;
+                        button.className = 'bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow';
+                        button.addEventListener('click', () => searchRecipes('tag', tag));
+                        tagsContainer.appendChild(button);
+                    });
+                } catch (e) {
+                    console.error("Failed to load tags:", e);
+                    tagsContainer.innerHTML = '<p class="text-red-500">Could not load tags.</p>';
+                }
+            }
+            
             // --- Search Functionality ---
             const searchByNameInput = document.getElementById('search-by-name');
             const searchByIngredientsInput = document.getElementById('search-by-ingredients');
@@ -136,56 +137,20 @@
             searchByNameInput.addEventListener('input', debounce(() => searchRecipes('name', searchByNameInput.value), 300));
             searchByIngredientsInput.addEventListener('input', debounce(() => searchRecipes('ingredients', searchByIngredientsInput.value), 300));
 
-            // --- Tags Functionality ---
-            const tagsContainer = document.getElementById('tags-container');
-            // In a real application, you would likely fetch these tags from an API endpoint.
-            const availableTags = ['Quick & Easy', 'Dessert', 'Vegetarian', 'Chicken', 'Pasta', 'Healthy', 'Soup'];
-
-            function renderTags() {
-                availableTags.forEach(tag => {
-                    const tagButton = document.createElement('button');
-                    tagButton.className = 'bg-gray-200 hover:bg-blue-500 hover:text-white text-gray-700 font-semibold py-1 px-3 rounded-full text-sm transition-colors duration-200';
-                    tagButton.textContent = tag;
-                    tagButton.addEventListener('click', () => {
-                        // Clear other search inputs for a clean filter action
-                        searchByNameInput.value = '';
-                        searchByIngredientsInput.value = '';
-                        searchRecipes('tag', tag);
-                    });
-                    tagsContainer.appendChild(tagButton);
-                });
-            }
-            renderTags(); // Display the tags when the page loads
-
             async function searchRecipes(type, query) {
-                if (!query || (query.length < 2 && type !== 'tag')) { // Allow short tags like 'Soup'
-                    searchResultsContainer.innerHTML = '';
-                    return;
-                }
-
-                let endpoint;
+                if (!query || query.length < 1) { searchResultsContainer.innerHTML = ''; return; }
+                let endpoint = '';
                 if (type === 'name') {
                     endpoint = `/api/recipes/search?q=${query}`;
                 } else if (type === 'ingredients') {
                     endpoint = `/api/recipes/ingredients?q=${query}`;
                 } else if (type === 'tag') {
-                    // IMPORTANT: This requires a new backend endpoint to handle tag searches.
-                    // For example: /api/recipes/tags?q=... which might perform a 'LIKE' query on a 'tags' column.
                     endpoint = `/api/recipes/tags?q=${query}`;
-                    showToast(`Filtering by tag: "${query}"`);
-                } else {
-                    return; // Exit if search type is unknown
                 }
                 
                 const response = await fetch(endpoint);
-                if (!response.ok) {
-                    showToast('Could not fetch recipes. API endpoint might be missing.', 'bg-red-500');
-                    searchResultsContainer.innerHTML = '<p class="text-red-500">Error: The API for this filter may not be implemented yet.</p>';
-                    return;
-                }
-
                 const recipes = await response.json();
-                searchResultsContainer.innerHTML = recipes.length === 0 ? '<p class="text-gray-500">No recipes found for this filter.</p>' : '';
+                searchResultsContainer.innerHTML = recipes.length === 0 ? '<p class="text-gray-500">No recipes found.</p>' : '';
                 recipes.forEach(recipe => {
                     const card = document.createElement('div');
                     card.className = 'bg-gray-200 p-4 rounded-lg shadow cursor-pointer hover:bg-gray-300';
@@ -205,15 +170,15 @@
                 const recipe = await response.json();
                 recipeModalTitle.textContent = recipe.name;
 
-                let ingredientsHtml = '';
+                let ingredientsHtml = '<h4>Ingredients:</h4>';
                 try {
                     const ingredientsData = JSON.parse(recipe.ingredients);
                     ingredientsData.forEach(section => {
                         ingredientsHtml += `<h5 class="font-semibold mt-2">${section.section_title}</h5>`;
                         const itemsHtml = section.items.map(ing => {
-                            const fullText = `${ing.quantity} ${ing.name} ${ing.notes || ''}`.trim();
+                            const fullText = `${ing.quantity || ''} ${ing.unit || ''} ${ing.name} ${ing.notes || ''}`.trim();
                              return `<li class="flex items-center">
-                                <input type="checkbox" class="mr-3 h-5 w-5 ingredient-checkbox" data-name="${ing.name}" data-quantity="${ing.quantity}" data-unit="${ing.unit || ''}">
+                                <input type="checkbox" class="mr-3 h-5 w-5 ingredient-checkbox" data-name="${ing.name}" data-quantity="${ing.quantity || ''}" data-unit="${ing.unit || ''}">
                                 <span>${fullText}</span>
                             </li>`;
                         }).join('');
@@ -223,7 +188,7 @@
                     ingredientsHtml = `<p>${recipe.ingredients}</p>`;
                 }
 
-                let instructionsHtml = '';
+                let instructionsHtml = '<h4>Instructions:</h4>';
                 try {
                     const instructionsData = JSON.parse(recipe.instructions);
                     const itemsHtml = instructionsData.map(step => `<li>${step}</li>`).join('');
@@ -233,12 +198,10 @@
                 }
 
                 recipeModalContent.innerHTML = `
-                    <h4 class="font-bold mt-4">Ingredients:</h4>
                     ${ingredientsHtml}
                     <div class="text-right mt-4">
                         <button id="add-to-list-btn" data-recipe-name="${recipe.name}" class="bg-green-500 text-white p-2 rounded">Add Selected to Shopping List</button>
                     </div>
-                    <h4 class="font-bold mt-4">Instructions:</h4>
                     ${instructionsHtml}
                     <h4 class="font-bold mt-4">Meal Log:</h4>
                     <p>You have logged this meal ${recipe.log_count} time(s).</p>
@@ -257,7 +220,7 @@
                 const recipeName = e.target.dataset.recipeName;
                 const selectedCheckboxes = document.querySelectorAll('.ingredient-checkbox:checked');
                 if (selectedCheckboxes.length === 0) {
-                    showToast('Please select at least one ingredient.', 'bg-red-500');
+                    showToast('Please select at least one ingredient to add.', 'error');
                     return;
                 }
                 const items = Array.from(selectedCheckboxes).map(cb => ({
@@ -271,20 +234,20 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ items, recipe_name: recipeName }),
                 });
-                showToast(`${items.length} item(s) added to your shopping list!`, 'bg-green-500');
+                showToast(`${items.length} item(s) added to your shopping list!`, 'success');
                 toggleModal(recipeModal, false);
             }
 
             async function handleLogMeal(e) {
                 const recipeId = e.target.dataset.recipeId;
                 const eatenDate = document.getElementById('eaten-date').value;
-                if (!eatenDate) { showToast('Please select a date.', 'bg-red-500'); return; }
+                if (!eatenDate) { showToast('Please select a date.', 'error'); return; }
                 await fetch('/api/meal-log', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ recipe_id: recipeId, eaten_date: eatenDate, notes: '' }),
                 });
-                showToast('Meal logged successfully!', 'bg-green-500');
+                showToast('Meal logged successfully!', 'success');
                 toggleModal(recipeModal, false);
             }
 
@@ -318,7 +281,7 @@
                     const itemsHtml = groupedByRecipe[recipeName].map(item => `
                         <li class="flex items-center ml-4">
                             <input type="checkbox" data-id="${item.id}" class="mr-3 h-5 w-5 shopping-item-checkbox" ${item.is_checked ? 'checked' : ''}>
-                            <span class="${item.is_checked ? 'checked-item' : ''}">${item.quantity} ${item.unit || ''} ${item.ingredient_name}</span>
+                            <span class="${item.is_checked ? 'checked-item' : ''}">${item.quantity || ''} ${item.unit || ''} ${item.ingredient_name}</span>
                         </li>
                     `).join('');
                     recipeGroup.innerHTML = `<h4 class="font-bold text-lg">${recipeName}</h4><ul class="list-none">${itemsHtml}</ul>`;
@@ -329,7 +292,7 @@
             document.getElementById('update-checked-btn').addEventListener('click', async () => {
                 const checkboxes = document.querySelectorAll('.shopping-item-checkbox');
                 const updates = Array.from(checkboxes).map(cb => ({
-                    id: parseInt(cb.dataset.id), // Ensure ID is an integer
+                    id: cb.dataset.id,
                     is_checked: cb.checked,
                 }));
                 await fetch('/api/shopping-list/update', {
@@ -337,16 +300,16 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ updates }),
                 });
-                showToast('List updated!');
-                await showShoppingList(); // Refresh list to show changes
+                showToast('List updated!', 'success');
+                await showShoppingList();
             });
 
             document.getElementById('clear-checked-items-btn').addEventListener('click', async () => {
-                // We can implement a custom confirmation modal later if desired
-                // For now, we proceed without the blocking confirm()
-                await fetch('/api/shopping-list/clear', { method: 'DELETE' });
-                showToast('Checked items cleared.', 'bg-red-500');
-                await showShoppingList();
+                // Using a custom confirm modal would be better, but for now window.confirm is used
+                if (confirm('Are you sure you want to clear all checked items?')) {
+                    await fetch('/api/shopping-list/clear', { method: 'DELETE' });
+                    await showShoppingList();
+                }
             });
 
             // --- Generic Modal Logic ---
@@ -369,6 +332,18 @@
                     timeout = setTimeout(() => func.apply(this, args), wait);
                 };
             }
+
+            function showToast(message, type = 'success') {
+                const toast = document.getElementById('toast-notification');
+                toast.textContent = message;
+                toast.className = `toast ${type} show`;
+                setTimeout(() => {
+                    toast.className = toast.className.replace('show', '');
+                }, 3000);
+            }
+
+            // Initial load
+            loadAndDisplayTags();
         });
     </script>
 </body>
