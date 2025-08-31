@@ -39,7 +39,7 @@
             <!-- Header section - now responsive -->
             <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
                 <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-0">Recipe Finder</h1>
-                <div class="flex flex-col sm:flex-row w-full sm:w-auto">
+                <div id="header-actions-container" class="flex flex-col sm:flex-row w-full sm:w-auto">
                     <span id="user-greeting" class="text-gray-600 mb-2 sm:mb-0 sm:mr-4 text-center sm:text-left"></span>
                      <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                         <button id="meal-log-button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
@@ -51,16 +51,20 @@
                      </div>
                 </div>
             </div>
-            <!-- Search inputs - now responsive -->
-            <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
-                <input type="text" id="search-by-name" placeholder="Search by recipe name..." class="p-2 border border-gray-300 rounded-md w-full sm:w-1/2">
-                <input type="text" id="search-by-ingredients" placeholder="Search by ingredients (e.g., chicken, tomato)..." class="p-2 border border-gray-300 rounded-md w-full sm:w-1/2">
+            
+            <!-- Container for search inputs and clear button -->
+            <div id="search-container">
+                <!-- Search inputs - now responsive -->
+                <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
+                    <input type="text" id="search-by-name" placeholder="Search by recipe name..." class="p-2 border border-gray-300 rounded-md w-full sm:w-1/2">
+                    <input type="text" id="search-by-ingredients" placeholder="Search by ingredients (e.g., chicken, tomato)..." class="p-2 border border-gray-300 rounded-md w-full sm:w-1/2">
+                </div>
+                <div class="flex justify-end mb-4">
+                    <button id="clear-search-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded w-full sm:w-auto">
+                       Clear Search
+                   </button>
+               </div>
             </div>
-            <div class="flex justify-end mb-4">
-                <button id="clear-search-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded w-full sm:w-auto">
-                   Clear Search
-               </button>
-           </div>
 
             <!-- Tags Section - Now Collapsible -->
             <div class="mb-4">
@@ -150,9 +154,15 @@
             const tagsWrapper = document.getElementById('tags-wrapper');
             const tagsArrow = document.getElementById('tags-arrow');
             const selectedTagDisplay = document.getElementById('selected-tag-display');
+            const searchContainer = document.getElementById('search-container');
+            const headerActionsContainer = document.getElementById('header-actions-container');
+
 
             toggleTagsBtn.addEventListener('click', () => {
-                tagsWrapper.classList.toggle('hidden');
+                const isTagsBecomingHidden = tagsWrapper.classList.toggle('hidden');
+                searchContainer.classList.toggle('hidden', !isTagsBecomingHidden);
+                headerActionsContainer.classList.toggle('hidden', !isTagsBecomingHidden);
+
                 tagsArrow.textContent = tagsWrapper.classList.contains('hidden') ? '▼' : '▲';
                  if (!tagsWrapper.classList.contains('hidden')) {
                     selectedTagDisplay.textContent = '';
@@ -171,6 +181,8 @@
                         button.addEventListener('click', () => {
                             searchRecipes('tag', tag);
                             tagsWrapper.classList.add('hidden');
+                            searchContainer.classList.remove('hidden');
+                            headerActionsContainer.classList.remove('hidden');
                             tagsArrow.textContent = '▼';
                             selectedTagDisplay.textContent = `: ${tag}`;
                         });
