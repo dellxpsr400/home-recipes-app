@@ -144,9 +144,27 @@
                 const identityRes = await fetch('/cdn-cgi/access/get-identity');
                 if (identityRes.ok) {
                     const identity = await identityRes.json();
-                    userGreeting.textContent = `Hello, ${identity.email}!`;
-                } else { userGreeting.textContent = 'Welcome!'; }
-            } catch (e) { userGreeting.textContent = 'Welcome!'; }
+                    const currentUserEmail = identity.email;
+
+                    // --- EDIT THIS MAP ---
+                    // Map user emails to the friendly names you want to display.
+                    const nameMap = {
+                        'nicolasj.oliver@gmail.com': 'Nick',   // Replace with Nick's actual email
+                        'rachelcasey246@gmail.com': 'Rach',   // Replace with Rach's actual email
+                        'rosieoliver168@gmail.com': 'Rosie'  // Replace with Rosie's actual email
+                    };
+
+                    // Look for a friendly name in the map.
+                    // If not found, fall back to the username part of the email.
+                    const friendlyName = nameMap[currentUserEmail] || currentUserEmail.split('@')[0];
+                    
+                    userGreeting.textContent = `Hello, ${friendlyName}!`;
+                } else { 
+                    userGreeting.textContent = 'Welcome!'; 
+                }
+            } catch (e) { 
+                userGreeting.textContent = 'Welcome!'; 
+            }
 
             // --- Tags Functionality ---
             const tagsContainer = document.getElementById('tags-container');
