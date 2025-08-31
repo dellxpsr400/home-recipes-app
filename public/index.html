@@ -160,7 +160,12 @@
                         const button = document.createElement('button');
                         button.textContent = tag;
                         button.className = 'bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow';
-                        button.addEventListener('click', () => searchRecipes('tag', tag));
+                        button.addEventListener('click', () => {
+                            searchRecipes('tag', tag);
+                            // Add these two lines to collapse the container after a tag is clicked
+                            tagsWrapper.classList.add('hidden');
+                            tagsArrow.textContent = '▼';
+                        });
                         tagsContainer.appendChild(button);
                     });
                 } catch (e) {
@@ -445,4 +450,5 @@
     </script>
 </body>
 </html>
+
 
