@@ -4,6 +4,6 @@ git status
 
 git add .
 
-git commit -m "Fix(DB): Add missing is_checked column to shopping_list schema"
+git commit -m "re dynamic tags - 1746 31/8/25"
 
-git push
+git push origin feature/shopping-list

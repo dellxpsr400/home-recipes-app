@@ -1,5 +1,4 @@
 // functions/[[path]].ts
-// 31/8/25 - now includes logic for tag search
 
 interface Env {
   DB: D1Database;
@@ -38,6 +37,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
     
+    // NEW: Endpoint to get all unique tags from the database
+    if (path.startsWith('/api/tags')) {
+      const { results } = await env.DB.prepare("SELECT tags FROM recipes").all();
+      const allTags = new Set();
+      results.forEach(item => {
+        try {
+          const tags = JSON.parse(item.tags as string);
+          if (Array.isArray(tags)) {
+            tags.forEach(tag => allTags.add(tag));
+          }
+        } catch (e) {
+          // Ignore recipes with invalid tag formats
+        }
+      });
+      return new Response(JSON.stringify(Array.from(allTags)), { headers: { 'Content-Type': 'application/json' } });
+    }
+
     // Get a single recipe by ID (publicly accessible, with extra data for logged-in users)
     if (path.match(/^\/api\/recipes\/\d+$/)) {
       const recipeId = path.split('/').pop();
@@ -150,3 +166,4 @@ async function getIdentity(request: Request): Promise<{ email: string } | null> 
         return null;
     }
 }
+

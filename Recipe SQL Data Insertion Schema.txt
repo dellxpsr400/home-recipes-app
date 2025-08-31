@@ -1,0 +1,48 @@
+Recipe SQL Data Insertion SchemaThis document outlines the exact format required for SQL scripts that insert new recipes into the database. Following this schema ensures data consistency and compatibility with the application's frontend and backend.1. Table StructureThe recipes table is defined with the following columns and data types.CREATE TABLE IF NOT EXISTS recipes (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  tags TEXT,
+  ingredients TEXT,
+  instructions TEXT
+);
+2. SQL Insert Script FormatAll new recipe data must be provided in an SQL script that adheres to the following structure and formatting rules.2.1. File PreambleThe script should begin with a comment block explaining its purpose and a DELETE statement to ensure the script is idempotent (can be run multiple times without causing errors).-- This script first DELETES any existing recipes within a specific ID range to prevent conflicts,
+-- then INSERTS the new, corrected versions.
+-- To escape a single quote (') in the text, it has been replaced with two single quotes ('').
+
+DELETE FROM recipes WHERE id >= [START_ID];
+2.2. Individual Recipe Entry FormatEach recipe must be inserted using the following multi-line format.Comment Header: Each INSERT statement must be preceded by a comment identifying the recipe number (e.g., -- ========== RECIPE 77 ==========).Column Order: The INSERT statement must specify the columns in this exact order: (id, name, tags, ingredients, instructions).Data Formatting:id (INTEGER): The unique recipe number.name (TEXT): The recipe title, enclosed in single quotes.tags (TEXT): A single string of comma-separated values, enclosed in single quotes. Do not use a JSON array.ingredients (TEXT): A JSON string, enclosed in single quotes. The JSON should be formatted with indentation for readability.instructions (TEXT): A JSON array of strings, enclosed in single quotes. The JSON should be formatted with indentation for readability.2.3. Example TemplateThis example demonstrates the exact formatting required for a single recipe entry.-- ========== RECIPE 77 ==========
+INSERT INTO recipes (id, name, tags, ingredients, instructions) VALUES
+(
+  77,
+  'North African squash and chickpea stew',
+  'Stew, Vegan, Main Course',
+  '[
+    {"section_title": "Ingredients", "items": [
+      {"name": "sunflower oil", "quantity": "2 tablespoons", "notes": ""},
+      {"name": "large onions", "quantity": "2", "notes": "diced"},
+      {"name": "garlic cloves", "quantity": "2", "notes": "finely chopped"},
+      {"name": "celery stalk", "quantity": "1", "notes": "finely diced"},
+      {"name": "freshly ground black pepper", "quantity": "1 teaspoon", "notes": ""},
+      {"name": "ground turmeric", "quantity": "1 teaspoon", "notes": ""},
+      {"name": "ground cinnamon", "quantity": "½ teaspoon", "notes": ""},
+      {"name": "ground ginger", "quantity": "½ teaspoon", "notes": ""},
+      {"name": "red lentils", "quantity": "100g", "notes": ""},
+      {"name": "chickpeas", "quantity": "400g tin", "notes": "drained and rinsed"},
+      {"name": "saffron strands", "quantity": "8", "notes": "toasted and crushed"},
+      {"name": "roasted tomato sauce or passata", "quantity": "500ml", "notes": ""},
+      {"name": "parsley", "quantity": "A good handful", "notes": "roughly chopped"},
+      {"name": "coriander", "quantity": "A large bunch", "notes": "roughly chopped"},
+      {"name": "squash or pumpkin", "quantity": "300g", "notes": ""},
+      {"name": "vegetable stock", "quantity": "1.2 litres", "notes": ""},
+      {"name": "bay leaf", "quantity": "1", "notes": ""},
+      {"name": "vermicelli, orzo or other small pasta", "quantity": "50g", "notes": ""},
+      {"name": "Dates", "quantity": "to serve", "notes": "(optional)"}
+    ]}
+  ]',
+  '[
+    "Heat the oil in a large saucepan over a medium heat. Add the onions and sauté until just starting to turn golden. Turn the heat down to medium-low and add the garlic, celery, pepper, turmeric, cinnamon and ginger. Sauté for a couple of minutes.",
+    "Now add the lentils, chickpeas, saffron, tomato sauce or passata, parsley and about half the coriander. Cook over a low heat for 15 minutes.",
+    "Meanwhile, peel and deseed the squash or pumpkin and cut into large cubes. Add to the pan with the stock and bay leaf. Cover and simmer gently for about 30 minutes. Add the pasta and simmer until it is cooked. Season with salt and pepper to taste.",
+    "Serve immediately, scattered with the remaining coriander leaves and with a few dates on the side, if you like."
+  ]'
+);
