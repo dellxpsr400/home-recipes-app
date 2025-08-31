@@ -49,6 +49,11 @@
                 <input type="text" id="search-by-name" placeholder="Search by recipe name..." class="p-2 border border-gray-300 rounded-md w-1/2">
                 <input type="text" id="search-by-ingredients" placeholder="Search by ingredients (e.g., chicken, tomato)..." class="p-2 border border-gray-300 rounded-md w-1/2">
             </div>
+            <div class="flex justify-end mb-4">
+                <button id="clear-search-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">
+                   Clear Search
+               </button>
+           </div>
 
             <!-- Tags Section - Now Collapsible -->
             <div class="mb-4">
@@ -148,8 +153,16 @@
             const searchByNameInput = document.getElementById('search-by-name');
             const searchByIngredientsInput = document.getElementById('search-by-ingredients');
             const searchResultsContainer = document.getElementById('search-results');
+            const clearSearchBtn = document.getElementById('clear-search-btn');
+
             searchByNameInput.addEventListener('input', debounce(() => searchRecipes('name', searchByNameInput.value), 300));
             searchByIngredientsInput.addEventListener('input', debounce(() => searchRecipes('ingredients', searchByIngredientsInput.value), 300));
+            
+            clearSearchBtn.addEventListener('click', () => {
+                searchByNameInput.value = '';
+                searchByIngredientsInput.value = '';
+                searchResultsContainer.innerHTML = '';
+            });
 
             async function searchRecipes(type, query) {
                 if (!query || query.length < 1) { searchResultsContainer.innerHTML = ''; return; }
