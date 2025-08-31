@@ -50,11 +50,16 @@
                 <input type="text" id="search-by-ingredients" placeholder="Search by ingredients (e.g., chicken, tomato)..." class="p-2 border border-gray-300 rounded-md w-1/2">
             </div>
 
-            <!-- Tags Section -->
+            <!-- Tags Section - Now Collapsible -->
             <div class="mb-4">
-                <h3 class="font-bold text-lg mb-2">Filter by Tag:</h3>
-                <div id="tags-container" class="flex flex-wrap gap-2">
-                    <!-- Tag buttons will be dynamically inserted here -->
+                <button id="toggle-tags-btn" class="font-bold text-lg mb-2 w-full text-left flex justify-between items-center">
+                    <span>Filter by Tag</span>
+                    <span id="tags-arrow">▼</span>
+                </button>
+                <div id="tags-wrapper" class="hidden">
+                    <div id="tags-container" class="flex flex-wrap gap-2 pt-2">
+                        <!-- Tag buttons will be dynamically inserted here -->
+                    </div>
                 </div>
             </div>
 
@@ -110,8 +115,17 @@
                 } else { userGreeting.textContent = 'Welcome!'; }
             } catch (e) { userGreeting.textContent = 'Welcome!'; }
 
-            // --- Load and Display Tags ---
+            // --- Tags Functionality ---
             const tagsContainer = document.getElementById('tags-container');
+            const toggleTagsBtn = document.getElementById('toggle-tags-btn');
+            const tagsWrapper = document.getElementById('tags-wrapper');
+            const tagsArrow = document.getElementById('tags-arrow');
+
+            toggleTagsBtn.addEventListener('click', () => {
+                tagsWrapper.classList.toggle('hidden');
+                tagsArrow.textContent = tagsWrapper.classList.contains('hidden') ? '▼' : '▲';
+            });
+
             async function loadAndDisplayTags() {
                 try {
                     const response = await fetch('/api/tags');
