@@ -168,7 +168,7 @@
                 recipes.forEach(recipe => {
                     const card = document.createElement('div');
                     card.className = 'bg-gray-200 p-4 rounded-lg shadow cursor-pointer hover:bg-gray-300';
-                    card.innerHTML = `<h3 class="font-bold text-lg">${recipe.name}</h3>`;
+                    card.innerHTML = `<h3 class="font-bold text-lg">(${recipe.id}) ${recipe.name}</h3>`;
                     card.addEventListener('click', () => showRecipeDetails(recipe.id));
                     searchResultsContainer.appendChild(card);
                 });
@@ -182,7 +182,7 @@
             async function showRecipeDetails(recipeId) {
                 const response = await fetch(`/api/recipes/${recipeId}`);
                 const recipe = await response.json();
-                recipeModalTitle.textContent = recipe.name;
+                recipeModalTitle.textContent = `(${recipe.id}) ${recipe.name}`;
 
                 // --- REVERTED: Simplified JSON parsing for ingredients ---
                 let ingredientsHtml = '<h4>Ingredients:</h4>';
@@ -364,5 +364,4 @@
     </script>
 </body>
 </html>
-
 
