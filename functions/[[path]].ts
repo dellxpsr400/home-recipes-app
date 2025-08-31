@@ -18,6 +18,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const { results } = await env.DB.prepare("SELECT * FROM recipes WHERE name LIKE ?").bind(`%${query}%`).all();
       return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
+
     if (path.startsWith('/api/recipes/ingredients')) {
         const ingredients = url.searchParams.get('q')?.split(',');
         if (!ingredients || ingredients.length === 0) return new Response('Query parameter "q" with comma-separated ingredients is required', { status: 400 });
@@ -26,34 +27,26 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const { results } = await env.DB.prepare(`SELECT * FROM recipes WHERE ${placeholders}`).bind(...bindings).all();
         return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
-    
-    // NEW: Handle searching by a single tag
+
     if (path.startsWith('/api/recipes/tags')) {
-        const tag = url.searchParams.get('q');
-        if (!tag) return new Response('Query parameter "q" is required for tags', { status: 400 });
-        const { results } = await env.DB.prepare("SELECT * FROM recipes WHERE tags LIKE ?").bind(`%${tag}%`).all();
-        return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+      const query = url.searchParams.get('q');
+      if (!query) return new Response('Query parameter "q" is required', { status: 400 });
+      const { results } = await env.DB.prepare("SELECT * FROM recipes WHERE tags LIKE ?").bind(`%${query}%`).all();
+      return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    // NEW: Handle fetching all unique tags
     if (path === '/api/tags') {
-        const { results } = await env.DB.prepare("SELECT tags FROM recipes WHERE tags IS NOT NULL AND tags != ''").all();
-        const allTags = new Set<string>();
-        
-        results.forEach((row: { tags: string }) => {
-            if (typeof row.tags === 'string') {
-                row.tags.split(',').forEach(tag => {
-                    const trimmedTag = tag.trim();
-                    if (trimmedTag) {
-                        allTags.add(trimmedTag);
-                    }
-                });
-            }
+      const { results } = await env.DB.prepare("SELECT tags FROM recipes WHERE tags IS NOT NULL AND tags != ''").all<{ tags: string }>();
+      const uniqueTags = results.reduce((acc, { tags }) => {
+        tags.split(',').forEach(tag => {
+          const trimmedTag = tag.trim();
+          if (trimmedTag) acc.add(trimmedTag);
         });
-        
-        return new Response(JSON.stringify(Array.from(allTags)), { headers: { 'Content-Type': 'application/json' } });
+        return acc;
+      }, new Set<string>());
+      return new Response(JSON.stringify(Array.from(uniqueTags)), { headers: { 'Content-Type': 'application/json' } });
     }
-
+    
     // Get a single recipe by ID (publicly accessible, with extra data for logged-in users)
     if (path.match(/^\/api\/recipes\/\d+$/)) {
       const recipeId = path.split('/').pop();
@@ -62,15 +55,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
       // Now, TRY to get user-specific data
       let logCount = 0;
-      try {
-        const identity = await getIdentity(request);
-        if (identity) {
-            const userId = identity.email;
-            const logCountResult: { count: number } | null = await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first();
-            logCount = logCountResult?.count ?? 0;
-        }
-      } catch (e) {
-        // Silently fail if identity check fails, as this is supplemental data
+      const identity = await getIdentity(request);
+      if (identity) {
+          const userId = identity.email;
+          const logCountResult = await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first<{ count: number }>();
+          logCount = logCountResult?.count ?? 0;
       }
       
       const responsePayload = { ...recipe, log_count: logCount };
@@ -85,14 +74,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (path.startsWith('/api/')) {
             return new Response('Unauthorized: User identity could not be determined.', { status: 401 });
         }
-        // For non-api routes, just continue to serve the static asset
         return context.next();
     }
     const userId = identity.email;
+
+    // GET /api/meal-log: Fetch all meal log entries for the current user
+    if (path === '/api/meal-log' && request.method === 'GET') {
+      const { results } = await env.DB.prepare(
+        "SELECT ml.eaten_date, r.name as recipe_name FROM meal_log ml JOIN recipes r ON ml.recipe_id = r.id WHERE ml.user_id = ? ORDER BY ml.eaten_date DESC"
+      ).bind(userId).all();
+      return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+    }
     
     // Add a meal log entry
     if (path.startsWith('/api/meal-log') && request.method === 'POST') {
-        const { recipe_id, eaten_date, notes } = await request.json() as { recipe_id: number, eaten_date: string, notes: string };
+        const { recipe_id, eaten_date, notes } = await request.json<{ recipe_id: number; eaten_date: string; notes: string; }>();
         if (!recipe_id || !eaten_date) return new Response('recipe_id and eaten_date are required', { status: 400 });
         await env.DB.prepare("INSERT INTO meal_log (recipe_id, eaten_date, user_id, notes) VALUES (?, ?, ?, ?)").bind(recipe_id, eaten_date, userId, notes).run();
         return new Response(JSON.stringify({ success: true }), { status: 201 });
@@ -110,13 +106,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // POST /api/shopping-list: Add multiple items to the list
     if (path === '/api/shopping-list' && request.method === 'POST') {
-      const { items, recipe_name } = await request.json() as { items: {name: string, quantity: string, unit: string}[], recipe_name: string };
+      const { items, recipe_name } = await request.json<{ items: { name: string; quantity: string; unit: string; }[]; recipe_name: string; }>();
       if (!items || !Array.isArray(items) || items.length === 0 || !recipe_name) {
         return new Response('A recipe_name and an array of items are required.', { status: 400 });
       }
       const stmt = env.DB.prepare("INSERT INTO shopping_list (user_id, ingredient_name, quantity, unit, recipe_name) VALUES (?, ?, ?, ?, ?)");
       const batch = items.map(item => {
-        const unitValue = item.unit || '';
+        const unitValue = item.unit || ''; // Use an empty string if unit is not provided
         return stmt.bind(userId, item.name, item.quantity, unitValue, recipe_name);
       });
       await env.DB.batch(batch);
@@ -125,7 +121,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // PUT /api/shopping-list/update: Update the checked status of multiple items
     if (path === '/api/shopping-list/update' && request.method === 'PUT') {
-        const { updates } = await request.json() as { updates: {id: number, is_checked: boolean}[] };
+        const { updates } = await request.json<{ updates: { id: string; is_checked: boolean; }[] }>();
         if (!updates || !Array.isArray(updates)) {
             return new Response('An array of updates is required.', { status: 400 });
         }
@@ -144,10 +140,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // Fallback for any other path - pass through to the static assets
     return context.next();
 
-  } catch (e: any) {
+  } catch (e) {
     console.error("Caught error in onRequest handler:", e);
-    const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
-    return new Response(`Internal Server Error: ${errorMessage}`, { status: 500 });
+    return new Response('Internal Server Error', { status: 500 });
   }
 };
 
@@ -161,7 +156,9 @@ async function getIdentity(request: Request): Promise<{ email: string } | null> 
         const res = await fetch(identityUrl, { headers });
 
         if (!res.ok) {
-            // This is not necessarily an error, just means user is not logged in.
+            console.error(`getIdentity failed with status: ${res.status} ${res.statusText}`);
+            const errorText = await res.text();
+            console.error(`getIdentity error response: ${errorText}`);
             return null;
         }
         return await res.json();
