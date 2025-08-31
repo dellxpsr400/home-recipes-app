@@ -18,7 +18,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const { results } = await env.DB.prepare("SELECT * FROM recipes WHERE name LIKE ?").bind(`%${query}%`).all();
       return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
-
     if (path.startsWith('/api/recipes/ingredients')) {
         const ingredients = url.searchParams.get('q')?.split(',');
         if (!ingredients || ingredients.length === 0) return new Response('Query parameter "q" with comma-separated ingredients is required', { status: 400 });
@@ -28,30 +27,31 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
     
-    // NEW: Handle tag-based searches
+    // NEW: Handle searching by a single tag
     if (path.startsWith('/api/recipes/tags')) {
-      const tag = url.searchParams.get('q');
-      if (!tag) return new Response('Query parameter "q" for tag is required', { status: 400 });
-      // The tags are stored as a JSON string array '["Tag1", "Tag2"]', so we use LIKE to find matches.
-      const { results } = await env.DB.prepare("SELECT * FROM recipes WHERE tags LIKE ?").bind(`%${tag}%`).all();
-      return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+        const tag = url.searchParams.get('q');
+        if (!tag) return new Response('Query parameter "q" is required for tags', { status: 400 });
+        const { results } = await env.DB.prepare("SELECT * FROM recipes WHERE tags LIKE ?").bind(`%${tag}%`).all();
+        return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
-    
-    // NEW: Endpoint to get all unique tags from the database
-    if (path.startsWith('/api/tags')) {
-      const { results } = await env.DB.prepare("SELECT tags FROM recipes").all();
-      const allTags = new Set();
-      results.forEach(item => {
-        try {
-          const tags = JSON.parse(item.tags as string);
-          if (Array.isArray(tags)) {
-            tags.forEach(tag => allTags.add(tag));
-          }
-        } catch (e) {
-          // Ignore recipes with invalid tag formats
-        }
-      });
-      return new Response(JSON.stringify(Array.from(allTags)), { headers: { 'Content-Type': 'application/json' } });
+
+    // NEW: Handle fetching all unique tags
+    if (path === '/api/tags') {
+        const { results } = await env.DB.prepare("SELECT tags FROM recipes WHERE tags IS NOT NULL AND tags != ''").all();
+        const allTags = new Set<string>();
+        
+        results.forEach((row: { tags: string }) => {
+            if (typeof row.tags === 'string') {
+                row.tags.split(',').forEach(tag => {
+                    const trimmedTag = tag.trim();
+                    if (trimmedTag) {
+                        allTags.add(trimmedTag);
+                    }
+                });
+            }
+        });
+        
+        return new Response(JSON.stringify(Array.from(allTags)), { headers: { 'Content-Type': 'application/json' } });
     }
 
     // Get a single recipe by ID (publicly accessible, with extra data for logged-in users)
@@ -62,11 +62,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
       // Now, TRY to get user-specific data
       let logCount = 0;
-      const identity = await getIdentity(request);
-      if (identity) {
-          const userId = identity.email;
-          const logCountResult = await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first();
-          logCount = logCountResult.count as number;
+      try {
+        const identity = await getIdentity(request);
+        if (identity) {
+            const userId = identity.email;
+            const logCountResult: { count: number } | null = await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first();
+            logCount = logCountResult?.count ?? 0;
+        }
+      } catch (e) {
+        // Silently fail if identity check fails, as this is supplemental data
       }
       
       const responsePayload = { ...recipe, log_count: logCount };
@@ -81,13 +85,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (path.startsWith('/api/')) {
             return new Response('Unauthorized: User identity could not be determined.', { status: 401 });
         }
+        // For non-api routes, just continue to serve the static asset
         return context.next();
     }
     const userId = identity.email;
     
     // Add a meal log entry
     if (path.startsWith('/api/meal-log') && request.method === 'POST') {
-        const { recipe_id, eaten_date, notes } = await request.json();
+        const { recipe_id, eaten_date, notes } = await request.json() as { recipe_id: number, eaten_date: string, notes: string };
         if (!recipe_id || !eaten_date) return new Response('recipe_id and eaten_date are required', { status: 400 });
         await env.DB.prepare("INSERT INTO meal_log (recipe_id, eaten_date, user_id, notes) VALUES (?, ?, ?, ?)").bind(recipe_id, eaten_date, userId, notes).run();
         return new Response(JSON.stringify({ success: true }), { status: 201 });
@@ -105,14 +110,14 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // POST /api/shopping-list: Add multiple items to the list
     if (path === '/api/shopping-list' && request.method === 'POST') {
-      const { items, recipe_name } = await request.json(); // Expect an array of items
+      const { items, recipe_name } = await request.json() as { items: {name: string, quantity: string, unit: string}[], recipe_name: string };
       if (!items || !Array.isArray(items) || items.length === 0 || !recipe_name) {
         return new Response('A recipe_name and an array of items are required.', { status: 400 });
       }
       const stmt = env.DB.prepare("INSERT INTO shopping_list (user_id, ingredient_name, quantity, unit, recipe_name) VALUES (?, ?, ?, ?, ?)");
       const batch = items.map(item => {
-          const unitValue = item.unit || ''; // Use an empty string if unit is not provided
-          return stmt.bind(userId, item.name, item.quantity, unitValue, recipe_name);
+        const unitValue = item.unit || '';
+        return stmt.bind(userId, item.name, item.quantity, unitValue, recipe_name);
       });
       await env.DB.batch(batch);
       return new Response(JSON.stringify({ success: true }), { status: 201 });
@@ -120,7 +125,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // PUT /api/shopping-list/update: Update the checked status of multiple items
     if (path === '/api/shopping-list/update' && request.method === 'PUT') {
-        const { updates } = await request.json(); // Expects an array of {id, is_checked}
+        const { updates } = await request.json() as { updates: {id: number, is_checked: boolean}[] };
         if (!updates || !Array.isArray(updates)) {
             return new Response('An array of updates is required.', { status: 400 });
         }
@@ -139,9 +144,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // Fallback for any other path - pass through to the static assets
     return context.next();
 
-  } catch (e) {
+  } catch (e: any) {
     console.error("Caught error in onRequest handler:", e);
-    return new Response('Internal Server Error', { status: 500 });
+    const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred';
+    return new Response(`Internal Server Error: ${errorMessage}`, { status: 500 });
   }
 };
 
@@ -155,9 +161,7 @@ async function getIdentity(request: Request): Promise<{ email: string } | null> 
         const res = await fetch(identityUrl, { headers });
 
         if (!res.ok) {
-            console.error(`getIdentity failed with status: ${res.status} ${res.statusText}`);
-            const errorText = await res.text();
-            console.error(`getIdentity error response: ${errorText}`);
+            // This is not necessarily an error, just means user is not logged in.
             return null;
         }
         return await res.json();
