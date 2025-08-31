@@ -110,7 +110,7 @@
                 } else { userGreeting.textContent = 'Welcome!'; }
             } catch (e) { userGreeting.textContent = 'Welcome!'; }
 
-            // --- NEW: Load and Display Tags ---
+            // --- Load and Display Tags ---
             const tagsContainer = document.getElementById('tags-container');
             async function loadAndDisplayTags() {
                 try {
@@ -170,6 +170,7 @@
                 const recipe = await response.json();
                 recipeModalTitle.textContent = recipe.name;
 
+                // --- REVERTED: Simplified JSON parsing for ingredients ---
                 let ingredientsHtml = '<h4>Ingredients:</h4>';
                 try {
                     const ingredientsData = JSON.parse(recipe.ingredients);
@@ -185,6 +186,7 @@
                         ingredientsHtml += `<ul class="list-disc list-inside">${itemsHtml}</ul>`;
                     });
                 } catch (e) {
+                    console.error("Could not parse ingredients JSON:", e);
                     ingredientsHtml = `<p>${recipe.ingredients}</p>`;
                 }
 
@@ -348,4 +350,5 @@
     </script>
 </body>
 </html>
+
 
