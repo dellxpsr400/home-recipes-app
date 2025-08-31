@@ -1,4 +1,5 @@
 // functions/[[path]].ts
+// 31/8/25 - now includes logic for tag search
 
 interface Env {
   DB: D1Database;
@@ -18,6 +19,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const { results } = await env.DB.prepare("SELECT * FROM recipes WHERE name LIKE ?").bind(`%${query}%`).all();
       return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
+
     if (path.startsWith('/api/recipes/ingredients')) {
         const ingredients = url.searchParams.get('q')?.split(',');
         if (!ingredients || ingredients.length === 0) return new Response('Query parameter "q" with comma-separated ingredients is required', { status: 400 });
@@ -25,6 +27,15 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const bindings = ingredients.map(i => `%${i.trim()}%`);
         const { results } = await env.DB.prepare(`SELECT * FROM recipes WHERE ${placeholders}`).bind(...bindings).all();
         return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+    }
+    
+    // NEW: Handle tag-based searches
+    if (path.startsWith('/api/recipes/tags')) {
+      const tag = url.searchParams.get('q');
+      if (!tag) return new Response('Query parameter "q" for tag is required', { status: 400 });
+      // The tags are stored as a JSON string array '["Tag1", "Tag2"]', so we use LIKE to find matches.
+      const { results } = await env.DB.prepare("SELECT * FROM recipes WHERE tags LIKE ?").bind(`%${tag}%`).all();
+      return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
     
     // Get a single recipe by ID (publicly accessible, with extra data for logged-in users)
@@ -84,9 +95,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
       const stmt = env.DB.prepare("INSERT INTO shopping_list (user_id, ingredient_name, quantity, unit, recipe_name) VALUES (?, ?, ?, ?, ?)");
       const batch = items.map(item => {
-    const unitValue = item.unit || ''; // Use an empty string if unit is not provided
-    return stmt.bind(userId, item.name, item.quantity, unitValue, recipe_name);
-});
+          const unitValue = item.unit || ''; // Use an empty string if unit is not provided
+          return stmt.bind(userId, item.name, item.quantity, unitValue, recipe_name);
+      });
       await env.DB.batch(batch);
       return new Response(JSON.stringify({ success: true }), { status: 201 });
     }
