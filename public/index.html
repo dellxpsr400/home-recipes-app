@@ -10,6 +10,31 @@
         .modal { transition: opacity 0.25s ease; }
         body.modal-active { overflow: hidden; }
         .checked-item { text-decoration: line-through; color: #9ca3af; }
+        
+        /* Toast Notification Styles */
+        #toast-notification {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            color: white;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s, transform 0.3s;
+        }
+        #toast-notification.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -10px);
+        }
+        #toast-notification.bg-green-500 { background-color: #22c55e; }
+        #toast-notification.bg-blue-500 { background-color: #3b82f6; }
+        #toast-notification.bg-red-500 { background-color: #ef4444; }
+
     </style>
 </head>
 <body class="bg-gray-100">
@@ -28,6 +53,13 @@
             <div class="flex space-x-4 mb-4">
                 <input type="text" id="search-by-name" placeholder="Search by recipe name..." class="p-2 border border-gray-300 rounded-md w-1/2">
                 <input type="text" id="search-by-ingredients" placeholder="Search by ingredients (e.g., chicken, tomato)..." class="p-2 border border-gray-300 rounded-md w-1/2">
+            </div>
+            <!-- Tags Panel -->
+            <div id="tags-panel" class="mb-4">
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">Filter by Tag</h3>
+                <div id="tags-container" class="flex flex-wrap gap-2">
+                    <!-- Tags will be dynamically inserted here by JavaScript -->
+                </div>
             </div>
             <div id="search-results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
         </div>
@@ -69,8 +101,24 @@
         </div>
     </div>
 
+    <!-- Toast Notification Element -->
+    <div id="toast-notification" role="alert"></div>
+
     <script>
         document.addEventListener('DOMContentLoaded', async function () {
+            // --- Toast Notification Logic ---
+            const toast = document.getElementById('toast-notification');
+            let toastTimeout;
+            function showToast(message, colorClass = 'bg-blue-500') {
+                clearTimeout(toastTimeout);
+                toast.textContent = message;
+                toast.className = ''; // Clear previous color classes
+                toast.classList.add(colorClass, 'show');
+                toastTimeout = setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 3000); // Hide after 3 seconds
+            }
+
             // --- User Info ---
             const userGreeting = document.getElementById('user-greeting');
             try {
@@ -88,12 +136,56 @@
             searchByNameInput.addEventListener('input', debounce(() => searchRecipes('name', searchByNameInput.value), 300));
             searchByIngredientsInput.addEventListener('input', debounce(() => searchRecipes('ingredients', searchByIngredientsInput.value), 300));
 
+            // --- Tags Functionality ---
+            const tagsContainer = document.getElementById('tags-container');
+            // In a real application, you would likely fetch these tags from an API endpoint.
+            const availableTags = ['Quick & Easy', 'Dessert', 'Vegetarian', 'Chicken', 'Pasta', 'Healthy', 'Soup'];
+
+            function renderTags() {
+                availableTags.forEach(tag => {
+                    const tagButton = document.createElement('button');
+                    tagButton.className = 'bg-gray-200 hover:bg-blue-500 hover:text-white text-gray-700 font-semibold py-1 px-3 rounded-full text-sm transition-colors duration-200';
+                    tagButton.textContent = tag;
+                    tagButton.addEventListener('click', () => {
+                        // Clear other search inputs for a clean filter action
+                        searchByNameInput.value = '';
+                        searchByIngredientsInput.value = '';
+                        searchRecipes('tag', tag);
+                    });
+                    tagsContainer.appendChild(tagButton);
+                });
+            }
+            renderTags(); // Display the tags when the page loads
+
             async function searchRecipes(type, query) {
-                if (query.length < 3) { searchResultsContainer.innerHTML = ''; return; }
-                const endpoint = type === 'name' ? `/api/recipes/search?q=${query}` : `/api/recipes/ingredients?q=${query}`;
+                if (!query || (query.length < 2 && type !== 'tag')) { // Allow short tags like 'Soup'
+                    searchResultsContainer.innerHTML = '';
+                    return;
+                }
+
+                let endpoint;
+                if (type === 'name') {
+                    endpoint = `/api/recipes/search?q=${query}`;
+                } else if (type === 'ingredients') {
+                    endpoint = `/api/recipes/ingredients?q=${query}`;
+                } else if (type === 'tag') {
+                    // IMPORTANT: This requires a new backend endpoint to handle tag searches.
+                    // For example: /api/recipes/tags?q=... which might perform a 'LIKE' query on a 'tags' column.
+                    endpoint = `/api/recipes/tags?q=${query}`;
+                    showToast(`Filtering by tag: "${query}"`);
+                } else {
+                    return; // Exit if search type is unknown
+                }
+                
                 const response = await fetch(endpoint);
+                if (!response.ok) {
+                    showToast('Could not fetch recipes. API endpoint might be missing.', 'bg-red-500');
+                    searchResultsContainer.innerHTML = '<p class="text-red-500">Error: The API for this filter may not be implemented yet.</p>';
+                    return;
+                }
+
                 const recipes = await response.json();
-                searchResultsContainer.innerHTML = recipes.length === 0 ? '<p class="text-gray-500">No recipes found.</p>' : '';
+                searchResultsContainer.innerHTML = recipes.length === 0 ? '<p class="text-gray-500">No recipes found for this filter.</p>' : '';
                 recipes.forEach(recipe => {
                     const card = document.createElement('div');
                     card.className = 'bg-gray-200 p-4 rounded-lg shadow cursor-pointer hover:bg-gray-300';
@@ -113,7 +205,6 @@
                 const recipe = await response.json();
                 recipeModalTitle.textContent = recipe.name;
 
-                // --- MODIFIED: JSON Parsing for Ingredients ---
                 let ingredientsHtml = '';
                 try {
                     const ingredientsData = JSON.parse(recipe.ingredients);
@@ -122,25 +213,22 @@
                         const itemsHtml = section.items.map(ing => {
                             const fullText = `${ing.quantity} ${ing.name} ${ing.notes || ''}`.trim();
                              return `<li class="flex items-center">
-                                <input type="checkbox" class="mr-3 h-5 w-5 ingredient-checkbox" data-name="${ing.name}" data-quantity="${ing.quantity}" data-unit="">
+                                <input type="checkbox" class="mr-3 h-5 w-5 ingredient-checkbox" data-name="${ing.name}" data-quantity="${ing.quantity}" data-unit="${ing.unit || ''}">
                                 <span>${fullText}</span>
                             </li>`;
                         }).join('');
                         ingredientsHtml += `<ul class="list-disc list-inside">${itemsHtml}</ul>`;
                     });
                 } catch (e) {
-                    // Fallback for plain text
                     ingredientsHtml = `<p>${recipe.ingredients}</p>`;
                 }
 
-                // --- MODIFIED: JSON Parsing for Instructions ---
                 let instructionsHtml = '';
                 try {
                     const instructionsData = JSON.parse(recipe.instructions);
                     const itemsHtml = instructionsData.map(step => `<li>${step}</li>`).join('');
                     instructionsHtml = `<ol class="list-decimal list-inside">${itemsHtml}</ol>`;
                 } catch (e) {
-                     // Fallback for plain text
                     instructionsHtml = `<p class="whitespace-pre-wrap">${recipe.instructions}</p>`;
                 }
 
@@ -169,7 +257,7 @@
                 const recipeName = e.target.dataset.recipeName;
                 const selectedCheckboxes = document.querySelectorAll('.ingredient-checkbox:checked');
                 if (selectedCheckboxes.length === 0) {
-                    alert('Please select at least one ingredient to add.');
+                    showToast('Please select at least one ingredient.', 'bg-red-500');
                     return;
                 }
                 const items = Array.from(selectedCheckboxes).map(cb => ({
@@ -183,20 +271,20 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ items, recipe_name: recipeName }),
                 });
-                alert(`${items.length} item(s) added to your shopping list!`);
+                showToast(`${items.length} item(s) added to your shopping list!`, 'bg-green-500');
                 toggleModal(recipeModal, false);
             }
 
             async function handleLogMeal(e) {
                 const recipeId = e.target.dataset.recipeId;
                 const eatenDate = document.getElementById('eaten-date').value;
-                if (!eatenDate) { alert('Please select a date.'); return; }
+                if (!eatenDate) { showToast('Please select a date.', 'bg-red-500'); return; }
                 await fetch('/api/meal-log', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ recipe_id: recipeId, eaten_date: eatenDate, notes: '' }),
                 });
-                alert('Meal logged successfully!');
+                showToast('Meal logged successfully!', 'bg-green-500');
                 toggleModal(recipeModal, false);
             }
 
@@ -241,7 +329,7 @@
             document.getElementById('update-checked-btn').addEventListener('click', async () => {
                 const checkboxes = document.querySelectorAll('.shopping-item-checkbox');
                 const updates = Array.from(checkboxes).map(cb => ({
-                    id: cb.dataset.id,
+                    id: parseInt(cb.dataset.id), // Ensure ID is an integer
                     is_checked: cb.checked,
                 }));
                 await fetch('/api/shopping-list/update', {
@@ -249,15 +337,16 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ updates }),
                 });
-                alert('List updated!');
-                await showShoppingList();
+                showToast('List updated!');
+                await showShoppingList(); // Refresh list to show changes
             });
 
             document.getElementById('clear-checked-items-btn').addEventListener('click', async () => {
-                if (confirm('Are you sure you want to clear all checked items?')) {
-                    await fetch('/api/shopping-list/clear', { method: 'DELETE' });
-                    await showShoppingList();
-                }
+                // We can implement a custom confirmation modal later if desired
+                // For now, we proceed without the blocking confirm()
+                await fetch('/api/shopping-list/clear', { method: 'DELETE' });
+                showToast('Checked items cleared.', 'bg-red-500');
+                await showShoppingList();
             });
 
             // --- Generic Modal Logic ---
@@ -284,3 +373,4 @@
     </script>
 </body>
 </html>
+
