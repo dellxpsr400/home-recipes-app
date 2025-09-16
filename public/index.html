@@ -5,6 +5,7 @@ interface Env {
 }
 
 // Helper function to render the read-only recipe share page
+// this is an update forcing insignificant change
 function renderSharePage(recipe): Response {
     const ingredientsHtml = JSON.parse(recipe.ingredients).map(section => `
         <h3 class="text-xl font-semibold mt-4">${section.section_title}</h3>
