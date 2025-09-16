@@ -1,610 +1,268 @@
-<!-- public/index.html -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Recipes App</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        .modal { transition: opacity 0.25s ease; }
-        body.modal-active { overflow: hidden; }
-        .checked-item { text-decoration: line-through; color: #9ca3af; }
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 12px 24px;
-            border-radius: 8px;
-            color: white;
-            opacity: 0;
-            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
-            z-index: 1000;
-        }
-        .toast.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(-20px);
-        }
-        .toast.success { background-color: #28a745; }
-        .toast.error { background-color: #dc3545; }
-        /* Star rating styles */
-        .star-rating {
-            display: flex;
-            flex-direction: row-reverse;
-            justify-content: flex-end;
-            font-size: 2.5em;
-            cursor: pointer;
-        }
-        .star-rating input { display: none; }
-        .star-rating label {
-            color: #ddd;
-            transition: color 0.2s;
-        }
-        .star-rating input:checked ~ label,
-        .star-rating label:hover,
-        .star-rating label:hover ~ label {
-            color: #fcd34d; /* Tailwind yellow-300 */
-        }
-    </style>
-</head>
-<body class="bg-gray-100">
+// functions/[[path]].ts
 
-    <div id="toast-notification" class="toast"></div>
+interface Env {
+  DB: D1Database;
+}
 
-    <div class="container mx-auto p-4">
-        <div class="bg-white p-6 rounded-lg shadow-lg">
-            <!-- Header section - now responsive -->
-            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
-                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-0">Recipe Finder</h1>
-                <div id="header-actions-container" class="flex flex-col sm:flex-row w-full sm:w-auto">
-                    <span id="user-greeting" class="text-gray-600 mb-2 sm:mb-0 sm:mr-4 text-center sm:text-left"></span>
-                     <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                        <button id="meal-log-button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                            Meal Log
-                        </button>
-                        <button id="shopping-list-button" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-                            Shopping List
-                        </button>
-                     </div>
-                </div>
-            </div>
-            
-            <!-- Container for search inputs and clear button -->
-            <div id="search-container">
-                <!-- Search inputs - now responsive -->
-                <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
-                    <input type="text" id="search-by-name" placeholder="Search by name or number..." class="p-2 border border-gray-300 rounded-md w-full sm:w-1/2">
-                    <input type="text" id="search-by-ingredients" placeholder="Search by ingredients (e.g., chicken, tomato)..." class="p-2 border border-gray-300 rounded-md w-full sm:w-1/2">
-                </div>
-                <div class="flex justify-end mb-4">
-                    <button id="clear-search-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded w-full sm:w-auto">
-                       Clear Search
-                   </button>
-               </div>
-            </div>
+// Helper function to render the read-only recipe share page
+function renderSharePage(recipe): Response {
+    const ingredientsHtml = JSON.parse(recipe.ingredients).map(section => `
+        <h3 class="text-xl font-semibold mt-4">${section.section_title}</h3>
+        <ul class="list-disc list-inside pl-4 mt-2">
+            ${section.items.map(ing => `<li>${ing.quantity || ''} ${ing.unit || ''} ${ing.name} ${ing.notes || ''}`.trim()).join('')}
+        </ul>
+    `).join('');
 
-            <!-- Tags Section - Now Collapsible -->
-            <div class="mb-4">
-                <button id="toggle-tags-btn" class="font-bold text-lg mb-2 w-full text-left flex justify-between items-center">
-                    <span>Filter by Tag<span id="selected-tag-display" class="font-normal text-gray-500 ml-2"></span></span>
-                    <span id="tags-arrow">▼</span>
-                </button>
-                <div id="tags-wrapper" class="hidden">
-                    <div id="tags-container" class="flex flex-wrap gap-2 pt-2">
-                        <!-- Tag buttons will be dynamically inserted here -->
+    const instructionsHtml = JSON.parse(recipe.instructions).map(step => `
+        <li class="mb-2">${step}</li>
+    `).join('');
+
+    const html = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>${recipe.name}</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body class="bg-gray-100 font-sans">
+            <div class="container mx-auto p-4 sm:p-8">
+                <div class="bg-white p-6 sm:p-8 rounded-lg shadow-lg max-w-2xl mx-auto">
+                    <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">${recipe.name}</h1>
+                    <div class="prose max-w-none">
+                        <h2 class="text-2xl font-bold text-gray-700 border-b pb-2">Ingredients</h2>
+                        ${ingredientsHtml}
+                        <h2 class="text-2xl font-bold text-gray-700 border-b pb-2 mt-6">Instructions</h2>
+                        <ol class="list-decimal list-inside pl-4 mt-2">
+                            ${instructionsHtml}
+                        </ol>
                     </div>
+                    <p class="text-center text-gray-500 mt-8">Shared from the Home Recipes App</p>
                 </div>
             </div>
+        </body>
+        </html>
+    `;
 
-            <div id="search-results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-        </div>
-    </div>
-
-    <!-- Recipe Details Modal -->
-    <div id="recipe-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
-        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
-        <div class="modal-container bg-white w-11/12 md:max-w-2xl mx-auto rounded shadow-lg z-50 overflow-y-auto" style="max-height: 90vh;">
-            <div class="modal-content py-4 text-left px-6">
-                <div class="flex justify-between items-center pb-3">
-                    <p id="recipe-modal-title" class="text-2xl font-bold"></p>
-                    <div class="modal-close cursor-pointer z-50">
-                        <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
-                    </div>
-                </div>
-                <div id="recipe-modal-content" class="text-gray-700"></div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Shopping List Modal -->
-    <div id="shopping-list-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
-        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
-        <div class="modal-container bg-white w-11/12 md:max-w-lg mx-auto rounded shadow-lg z-50 overflow-y-auto" style="max-height: 90vh;">
-            <div class="modal-content py-4 text-left px-6">
-                <div class="flex justify-between items-center pb-3">
-                    <p class="text-2xl font-bold">Shopping List</p>
-                    <div class="modal-close cursor-pointer z-50">
-                         <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
-                    </div>
-                </div>
-                <div id="shopping-list-content" class="space-y-4"></div>
-                <div class="flex justify-end mt-4 space-x-2">
-                    <button id="update-checked-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Update List</button>
-                    <button id="clear-checked-items-btn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Clear Checked Items</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Meal Log Modal -->
-    <div id="meal-log-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
-        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
-        <div class="modal-container bg-white w-11/12 md:max-w-2xl mx-auto rounded shadow-lg z-50 overflow-y-auto" style="max-height: 90vh;">
-            <div class="modal-content py-4 text-left px-6">
-                <div class="flex justify-between items-center pb-3">
-                    <p class="text-2xl font-bold">Meal Log</p>
-                    <div class="modal-close cursor-pointer z-50">
-                         <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
-                    </div>
-                </div>
-                <div id="meal-log-content" class="space-y-4"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Confirmation Modal -->
-    <div id="confirm-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
-        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
-        <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded shadow-lg z-50 overflow-y-auto">
-            <div class="modal-content py-4 text-left px-6">
-                <div class="flex justify-between items-center pb-3">
-                    <p class="text-2xl font-bold">Confirm Action</p>
-                </div>
-                <p id="confirm-modal-text" class="text-gray-700 mb-4">Are you sure?</p>
-                <div class="flex justify-end space-x-2">
-                    <button id="confirm-cancel-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Cancel</button>
-                    <button id="confirm-ok-btn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Confirm</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+}
 
 
-    <script>
-        document.addEventListener('DOMContentLoaded', async function () {
-            let currentUserEmail = null;
+export const onRequest: PagesFunction<Env> = async (context) => {
+  const { request, env } = context;
+  const url = new URL(request.url);
+  const path = url.pathname;
 
-            // --- User Info ---
-            const userGreeting = document.getElementById('user-greeting');
-            try {
-                const identityRes = await fetch('/cdn-cgi/access/get-identity');
-                if (identityRes.ok) {
-                    const identity = await identityRes.json();
-                    currentUserEmail = identity.email;
+  // API Routing
+  try {
+    // --- PUBLIC SHARE ROUTE ---
+    if (path.startsWith('/share/')) {
+        const token = path.split('/').pop();
+        if (!token) return new Response('Share token missing', { status: 400 });
 
-                    // --- EDIT THIS MAP ---
-                    const nameMap = {
-                        'nicolasj.oliver@gmail.com': 'Nick',
-                        'rachelcasey246@gmail.com': 'Rach',
-                        'rosieoliver168@gmail.com': 'Rosie'
-                    };
+        // Find the recipe ID associated with the token
+        const share = await env.DB.prepare("SELECT recipe_id FROM recipe_shares WHERE token = ?").bind(token).first<{ recipe_id: number }>();
+        if (!share) return new Response('Recipe not found or share link is invalid', { status: 404 });
 
-                    const friendlyName = nameMap[currentUserEmail] || currentUserEmail.split('@')[0];
-                    userGreeting.textContent = `Hello, ${friendlyName}!`;
-                } else { 
-                    userGreeting.textContent = 'Welcome!'; 
-                }
-            } catch (e) { 
-                userGreeting.textContent = 'Welcome!'; 
-            }
+        // Fetch the recipe details
+        const recipe = await env.DB.prepare("SELECT * FROM recipes WHERE id = ?").bind(share.recipe_id).first();
+        if (!recipe) return new Response('Recipe not found', { status: 404 });
 
-            // --- Tags Functionality ---
-            const tagsContainer = document.getElementById('tags-container');
-            const toggleTagsBtn = document.getElementById('toggle-tags-btn');
-            const tagsWrapper = document.getElementById('tags-wrapper');
-            const tagsArrow = document.getElementById('tags-arrow');
-            const selectedTagDisplay = document.getElementById('selected-tag-display');
-            const searchContainer = document.getElementById('search-container');
-            const headerActionsContainer = document.getElementById('header-actions-container');
+        // Render and return the HTML page
+        return renderSharePage(recipe);
+    }
 
 
-            toggleTagsBtn.addEventListener('click', () => {
-                const isTagsBecomingHidden = tagsWrapper.classList.toggle('hidden');
-                searchContainer.classList.toggle('hidden', !isTagsBecomingHidden);
-                headerActionsContainer.classList.toggle('hidden', !isTagsBecomingHidden);
+    // --- PUBLIC API ROUTES (No login required) ---
+    if (path.startsWith('/api/recipes/search')) {
+      const query = url.searchParams.get('q');
+      if (!query) return new Response('Query parameter "q" is required', { status: 400 });
 
-                tagsArrow.textContent = tagsWrapper.classList.contains('hidden') ? '▼' : '▲';
-                 if (!tagsWrapper.classList.contains('hidden')) {
-                    selectedTagDisplay.textContent = '';
-                }
-            });
+      const queryAsNumber = parseInt(query, 10);
+      let results;
 
-            async function loadAndDisplayTags() {
-                try {
-                    const response = await fetch('/api/tags');
-                    const tags = await response.json();
-                    tagsContainer.innerHTML = ''; // Clear existing tags
-                    tags.sort().forEach(tag => {
-                        const button = document.createElement('button');
-                        button.textContent = tag;
-                        button.className = 'bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow';
-                        button.addEventListener('click', () => {
-                            searchRecipes('tag', tag);
-                            tagsWrapper.classList.add('hidden');
-                            searchContainer.classList.remove('hidden');
-                            headerActionsContainer.classList.remove('hidden');
-                            tagsArrow.textContent = '▼';
-                            selectedTagDisplay.textContent = `: ${tag}`;
-                        });
-                        tagsContainer.appendChild(button);
-                    });
-                } catch (e) {
-                    console.error("Failed to load tags:", e);
-                    tagsContainer.innerHTML = '<p class="text-red-500">Could not load tags.</p>';
-                }
-            }
-            
-            // --- Search Functionality ---
-            const searchByNameInput = document.getElementById('search-by-name');
-            const searchByIngredientsInput = document.getElementById('search-by-ingredients');
-            const searchResultsContainer = document.getElementById('search-results');
-            const clearSearchBtn = document.getElementById('clear-search-btn');
+      if (!isNaN(queryAsNumber)) {
+        const stmt = env.DB.prepare("SELECT * FROM recipes WHERE id = ? OR name LIKE ?");
+        ({ results } = await stmt.bind(queryAsNumber, `%${query}%`).all());
+      } else {
+        const stmt = env.DB.prepare("SELECT * FROM recipes WHERE name LIKE ?");
+        ({ results } = await stmt.bind(`%${query}%`).all());
+      }
+      
+      return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+    }
 
-            searchByNameInput.addEventListener('input', debounce(() => searchRecipes('nameOrId', searchByNameInput.value), 300));
-            searchByIngredientsInput.addEventListener('input', debounce(() => searchRecipes('ingredients', searchByIngredientsInput.value), 300));
-            
-            clearSearchBtn.addEventListener('click', () => {
-                searchByNameInput.value = '';
-                searchByIngredientsInput.value = '';
-                searchResultsContainer.innerHTML = '';
-                selectedTagDisplay.textContent = '';
-            });
+    if (path.startsWith('/api/recipes/ingredients')) {
+        const ingredients = url.searchParams.get('q')?.split(',');
+        if (!ingredients || ingredients.length === 0) return new Response('Query parameter "q" with comma-separated ingredients is required', { status: 400 });
+        const placeholders = ingredients.map(() => 'ingredients LIKE ?').join(' AND ');
+        const bindings = ingredients.map(i => `%${i.trim()}%`);
+        const { results } = await env.DB.prepare(`SELECT * FROM recipes WHERE ${placeholders}`).bind(...bindings).all();
+        return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+    }
 
-            async function searchRecipes(type, query) {
-                if (!query || query.length < 1) { searchResultsContainer.innerHTML = ''; return; }
-                let endpoint = '';
-                if (type === 'nameOrId') {
-                    endpoint = `/api/recipes/search?q=${query}`;
-                } else if (type === 'ingredients') {
-                    endpoint = `/api/recipes/ingredients?q=${query}`;
-                } else if (type === 'tag') {
-                    endpoint = `/api/recipes/tags?q=${query}`;
-                }
-                
-                const response = await fetch(endpoint);
-                const recipes = await response.json();
-                searchResultsContainer.innerHTML = recipes.length === 0 ? '<p class="text-gray-500">No recipes found.</p>' : '';
-                recipes.forEach(recipe => {
-                    const card = document.createElement('div');
-                    card.className = 'bg-gray-200 p-4 rounded-lg shadow cursor-pointer hover:bg-gray-300';
-                    card.innerHTML = `<h3 class="font-bold text-lg">(${recipe.id}) ${recipe.name}</h3>`;
-                    card.addEventListener('click', () => showRecipeDetails(recipe.id));
-                    searchResultsContainer.appendChild(card);
-                });
-            }
+    if (path.startsWith('/api/recipes/tags')) {
+      const query = url.searchParams.get('q');
+      if (!query) return new Response('Query parameter "q" is required', { status: 400 });
+      const { results } = await env.DB.prepare("SELECT * FROM recipes WHERE tags LIKE ?").bind(`%${query}%`).all();
+      return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+    }
 
-            // --- Recipe Modal ---
-            const recipeModal = document.getElementById('recipe-modal');
-            const recipeModalTitle = document.getElementById('recipe-modal-title');
-            const recipeModalContent = document.getElementById('recipe-modal-content');
-            
-            async function showRecipeDetails(recipeId) {
-                const response = await fetch(`/api/recipes/${recipeId}`);
-                if (!response.ok) {
-                    showToast('Could not load recipe details.', 'error');
-                    return;
-                }
-                const recipe = await response.json();
-                recipeModalTitle.textContent = `(${recipe.id}) ${recipe.name}`;
-
-                let ingredientsHtml = '<h4>Ingredients:</h4>';
-                try {
-                    const ingredientsData = JSON.parse(recipe.ingredients);
-                    ingredientsData.forEach(section => {
-                        ingredientsHtml += `<h5 class="font-semibold mt-2">${section.section_title}</h5>`;
-                        const itemsHtml = section.items.map(ing => {
-                            const fullText = `${ing.quantity || ''} ${ing.unit || ''} ${ing.name} ${ing.notes || ''}`.trim();
-                             return `<li class="flex items-center">
-                                <input type="checkbox" class="mr-3 h-5 w-5 ingredient-checkbox" data-name="${ing.name}" data-quantity="${ing.quantity || ''}" data-unit="${ing.unit || ''}">
-                                <span>${fullText}</span>
-                            </li>`;
-                        }).join('');
-                        ingredientsHtml += `<ul class="list-disc list-inside">${itemsHtml}</ul>`;
-                    });
-                } catch (e) {
-                    console.error("Could not parse ingredients JSON:", e);
-                    ingredientsHtml = `<p>${recipe.ingredients}</p>`;
-                }
-
-                let instructionsHtml = '<h4>Instructions:</h4>';
-                try {
-                    const instructionsData = JSON.parse(recipe.instructions);
-                    const itemsHtml = instructionsData.map(step => `<li>${step}</li>`).join('');
-                    instructionsHtml = `<ol class="list-decimal list-inside">${itemsHtml}</ol>`;
-                } catch (e) {
-                    instructionsHtml = `<p class="whitespace-pre-wrap">${recipe.instructions}</p>`;
-                }
-
-                // --- NEW: Ratings & Notes Section ---
-                const ratingsSectionHtml = `
-                    <div class="border-t mt-4 pt-4">
-                        <h4 class="font-bold">Your Rating & Notes</h4>
-                        <div class="star-rating my-2">
-                            <input type="radio" id="5-stars" name="rating" value="5" /><label for="5-stars">★</label>
-                            <input type="radio" id="4-stars" name="rating" value="4" /><label for="4-stars">★</label>
-                            <input type="radio" id="3-stars" name="rating" value="3" /><label for="3-stars">★</label>
-                            <input type="radio" id="2-stars" name="rating" value="2" /><label for="2-stars">★</label>
-                            <input type="radio" id="1-star" name="rating" value="1" /><label for="1-star">★</label>
-                        </div>
-                        <textarea id="recipe-notes" class="w-full p-2 border border-gray-300 rounded-md" rows="4" placeholder="Add your personal notes here..."></textarea>
-                        <div class="text-right mt-2">
-                            <button id="save-rating-btn" data-recipe-id="${recipe.id}" class="bg-purple-500 hover:bg-purple-700 text-white p-2 rounded">Save Rating & Notes</button>
-                        </div>
-                    </div>`;
-
-                recipeModalContent.innerHTML = `
-                    ${ingredientsHtml}
-                    <div class="text-right mt-4">
-                        <button id="add-to-list-btn" data-recipe-name="${recipe.name}" class="bg-green-500 text-white p-2 rounded">Add Selected to Shopping List</button>
-                    </div>
-                    ${instructionsHtml}
-                    <div class="border-t mt-4 pt-4">
-                        <h4 class="font-bold">Meal Log:</h4>
-                        <p>You have logged this meal ${recipe.log_count} time(s).</p>
-                        <div class="mt-2">
-                            <label for="eaten-date">Log this meal:</label>
-                            <input type="date" id="eaten-date" class="border p-1 rounded">
-                            <button id="log-meal-btn" data-recipe-id="${recipe.id}" class="bg-blue-500 text-white p-2 rounded ml-2">Log Meal</button>
-                        </div>
-                    </div>
-                    ${currentUserEmail ? ratingsSectionHtml : '<p class="mt-4 pt-4 border-t">Log in to add your own ratings and notes.</p>'}`;
-
-                // Populate existing rating and notes if they exist
-                if (currentUserEmail && recipe.user_rating) {
-                    const starInput = document.querySelector(`.star-rating input[value="${recipe.user_rating}"]`);
-                    if (starInput) starInput.checked = true;
-                }
-                if (currentUserEmail && recipe.user_notes) {
-                    document.getElementById('recipe-notes').value = recipe.user_notes;
-                }
-
-                toggleModal(recipeModal, true);
-                
-                document.getElementById('add-to-list-btn').addEventListener('click', handleAddToList);
-                document.getElementById('log-meal-btn').addEventListener('click', handleLogMeal);
-                if (currentUserEmail) {
-                    document.getElementById('save-rating-btn').addEventListener('click', handleSaveRating);
-                }
-            }
-            
-            async function handleSaveRating(e) {
-                const recipeId = e.target.dataset.recipeId;
-                const ratingInput = document.querySelector('.star-rating input:checked');
-                const rating = ratingInput ? ratingInput.value : null;
-                const notes = document.getElementById('recipe-notes').value;
-
-                if (!rating) {
-                    showToast('Please select a star rating.', 'error');
-                    return;
-                }
-
-                await fetch('/api/ratings', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ recipe_id: recipeId, rating: parseInt(rating), notes: notes }),
-                });
-
-                showToast('Rating and notes saved!', 'success');
-                toggleModal(recipeModal, false);
-            }
-
-            async function handleAddToList(e) {
-                const recipeName = e.target.dataset.recipeName;
-                const selectedCheckboxes = document.querySelectorAll('.ingredient-checkbox:checked');
-                if (selectedCheckboxes.length === 0) {
-                    showToast('Please select at least one ingredient to add.', 'error');
-                    return;
-                }
-                const items = Array.from(selectedCheckboxes).map(cb => ({
-                    name: cb.dataset.name,
-                    quantity: cb.dataset.quantity,
-                    unit: cb.dataset.unit,
-                }));
-                
-                await fetch('/api/shopping-list', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ items, recipe_name: recipeName }),
-                });
-                showToast(`${items.length} item(s) added to your shopping list!`, 'success');
-                toggleModal(recipeModal, false);
-            }
-
-            async function handleLogMeal(e) {
-                const recipeId = e.target.dataset.recipeId;
-                const eatenDate = document.getElementById('eaten-date').value;
-                if (!eatenDate) { showToast('Please select a date.', 'error'); return; }
-                await fetch('/api/meal-log', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ recipe_id: recipeId, eaten_date: eatenDate, notes: '' }),
-                });
-                showToast('Meal logged successfully!', 'success');
-                toggleModal(recipeModal, false);
-            }
-
-            // --- Shopping List Modal & Functionality ---
-            const shoppingListModal = document.getElementById('shopping-list-modal');
-            const shoppingListButton = document.getElementById('shopping-list-button');
-            const shoppingListContent = document.getElementById('shopping-list-content');
-            
-            shoppingListButton.addEventListener('click', showShoppingList);
-
-            async function showShoppingList() {
-                const response = await fetch('/api/shopping-list');
-                const items = await response.json();
-                renderShoppingList(items);
-                toggleModal(shoppingListModal, true);
-            }
-
-            function renderShoppingList(items) {
-                shoppingListContent.innerHTML = '';
-                if (items.length === 0) {
-                    shoppingListContent.innerHTML = '<p class="text-gray-500">Your shopping list is empty.</p>';
-                    return;
-                }
-                const groupedByRecipe = items.reduce((acc, item) => {
-                    (acc[item.recipe_name] = acc[item.recipe_name] || []).push(item);
-                    return acc;
-                }, {});
-
-                for (const recipeName in groupedByRecipe) {
-                    const recipeGroup = document.createElement('div');
-                    const itemsHtml = groupedByRecipe[recipeName].map(item => `
-                        <li class="flex items-center ml-4">
-                            <input type="checkbox" data-id="${item.id}" class="mr-3 h-5 w-5 shopping-item-checkbox" ${item.is_checked ? 'checked' : ''}>
-                            <span class="${item.is_checked ? 'checked-item' : ''}">${item.quantity || ''} ${item.unit || ''} ${item.ingredient_name}</span>
-                        </li>
-                    `).join('');
-                    recipeGroup.innerHTML = `<h4 class="font-bold text-lg">${recipeName}</h4><ul class="list-none">${itemsHtml}</ul>`;
-                    shoppingListContent.appendChild(recipeGroup);
-                }
-            }
-            
-            document.getElementById('update-checked-btn').addEventListener('click', async () => {
-                const checkboxes = document.querySelectorAll('.shopping-item-checkbox');
-                const updates = Array.from(checkboxes).map(cb => ({
-                    id: cb.dataset.id,
-                    is_checked: cb.checked,
-                }));
-                await fetch('/api/shopping-list/update', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ updates }),
-                });
-                showToast('List updated!', 'success');
-                await showShoppingList();
-            });
-
-            document.getElementById('clear-checked-items-btn').addEventListener('click', () => {
-                showConfirm(
-                    'Are you sure you want to clear all checked items?',
-                    async () => {
-                        await fetch('/api/shopping-list/clear', { method: 'DELETE' });
-                        await showShoppingList();
-                        showToast('Checked items cleared!', 'success');
-                    }
-                );
-            });
-
-            // --- Meal Log Modal ---
-            const mealLogModal = document.getElementById('meal-log-modal');
-            const mealLogButton = document.getElementById('meal-log-button');
-            const mealLogContent = document.getElementById('meal-log-content');
-
-            mealLogButton.addEventListener('click', showMealLog);
-
-            async function showMealLog() {
-                const response = await fetch('/api/meal-log');
-                if (!response.ok) {
-                    showToast('Please log in to view your meal log.', 'error');
-                    return;
-                }
-                const logs = await response.json();
-                renderMealLog(logs);
-                toggleModal(mealLogModal, true);
-            }
-
-            function renderMealLog(logs) {
-                mealLogContent.innerHTML = '';
-                if (logs.length === 0) {
-                    mealLogContent.innerHTML = '<p class="text-gray-500">You have not logged any meals yet.</p>';
-                    return;
-                }
-
-                const groupedByDate = logs.reduce((acc, log) => {
-                    (acc[log.eaten_date] = acc[log.eaten_date] || []).push(log);
-                    return acc;
-                }, {});
-
-                for (const date in groupedByDate) {
-                    const dateGroup = document.createElement('div');
-                    const itemsHtml = groupedByDate[date].map(log => `
-                        <li class="ml-4">${log.recipe_name}</li>
-                    `).join('');
-                    
-                    // Format date for display
-                    const displayDate = new Date(date + 'T00:00:00').toLocaleDateString('en-GB', {
-                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                    });
-
-                    dateGroup.innerHTML = `<h4 class="font-bold text-lg">${displayDate}</h4><ul class="list-disc list-inside">${itemsHtml}</ul>`;
-                    mealLogContent.appendChild(dateGroup);
-                }
-            }
-            
-            // --- Confirmation Modal Logic ---
-            const confirmModal = document.getElementById('confirm-modal');
-            const confirmModalText = document.getElementById('confirm-modal-text');
-            const confirmOkBtn = document.getElementById('confirm-ok-btn');
-            const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
-            let confirmCallback = null;
-
-            function showConfirm(message, onConfirm) {
-                confirmModalText.textContent = message;
-                confirmCallback = onConfirm;
-                toggleModal(confirmModal, true);
-            }
-
-            confirmOkBtn.addEventListener('click', () => {
-                if (confirmCallback) {
-                    confirmCallback();
-                }
-                toggleModal(confirmModal, false);
-            });
-
-            confirmCancelBtn.addEventListener('click', () => {
-                toggleModal(confirmModal, false);
-            });
-
-
-            // --- Generic Modal Logic ---
-            const closeButtons = document.querySelectorAll('.modal-close, .modal-overlay');
-            closeButtons.forEach(button => button.addEventListener('click', () => {
-                // Ensure all modals can be closed this way
-                document.querySelectorAll('.modal').forEach(modal => toggleModal(modal, false));
-            }));
-            function toggleModal(modal, show) {
-                if (!modal) return;
-                modal.classList.toggle('opacity-0', !show);
-                modal.classList.toggle('pointer-events-none', !show);
-                document.body.classList.toggle('modal-active', show);
-            }
-
-            // --- Utilities ---
-            function debounce(func, wait) {
-                let timeout;
-                return (...args) => {
-                    clearTimeout(timeout);
-                    timeout = setTimeout(() => func.apply(this, args), wait);
-                };
-            }
-
-            function showToast(message, type = 'success') {
-                const toast = document.getElementById('toast-notification');
-                toast.textContent = message;
-                toast.className = `toast ${type} show`;
-                setTimeout(() => {
-                    toast.className = toast.className.replace('show', '');
-                }, 3000);
-            }
-
-            // Initial load
-            loadAndDisplayTags();
+    if (path === '/api/tags') {
+      const { results } = await env.DB.prepare("SELECT tags FROM recipes WHERE tags IS NOT NULL AND tags != ''").all<{ tags: string }>();
+      const uniqueTags = results.reduce((acc, { tags }) => {
+        tags.split(',').forEach(tag => {
+          const trimmedTag = tag.trim();
+          if (trimmedTag) acc.add(trimmedTag);
         });
-    </script>
-</body>
-</html>
+        return acc;
+      }, new Set<string>());
+      return new Response(JSON.stringify(Array.from(uniqueTags)), { headers: { 'Content-Type': 'application/json' } });
+    }
+    
+    if (path.match(/^\/api\/recipes\/\d+$/)) {
+      const recipeId = path.split('/').pop();
+      const recipe = await env.DB.prepare("SELECT * FROM recipes WHERE id = ?").bind(recipeId).first();
+      if (!recipe) return new Response('Recipe not found', { status: 404 });
+
+      let responsePayload = { ...recipe, log_count: 0, user_rating: null, user_notes: null };
+
+      const identity = await getIdentity(request);
+      if (identity) {
+          const userId = identity.email;
+          const logCountResult = await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first<{ count: number }>();
+          responsePayload.log_count = logCountResult?.count ?? 0;
+
+          const ratingResult = await env.DB.prepare("SELECT rating, notes FROM recipe_ratings WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first<{ rating: number; notes: string }>();
+          if (ratingResult) {
+            responsePayload.user_rating = ratingResult.rating;
+            responsePayload.user_notes = ratingResult.notes;
+          }
+      }
+      
+      return new Response(JSON.stringify(responsePayload), { headers: { 'Content-Type': 'application/json' } });
+    }
+    
+    // --- SECURE API ROUTES (Login required) ---
+
+    const identity = await getIdentity(request);
+    if (!identity) {
+        if (path.startsWith('/api/')) {
+            return new Response('Unauthorized: User identity could not be determined.', { status: 401 });
+        }
+        return context.next();
+    }
+    const userId = identity.email;
+
+    // POST /api/recipes/:id/share - Create a share link
+    if (path.match(/^\/api\/recipes\/\d+\/share$/) && request.method === 'POST') {
+        const recipeId = path.split('/')[3];
+        
+        // Check if a token already exists for this recipe
+        let share = await env.DB.prepare("SELECT token FROM recipe_shares WHERE recipe_id = ?").bind(recipeId).first<{ token: string }>();
+
+        if (share) {
+            // If a token exists, return it
+            return new Response(JSON.stringify({ token: share.token }), { headers: { 'Content-Type': 'application/json' } });
+        } else {
+            // If not, create a new unique token
+            const token = crypto.randomUUID();
+            await env.DB.prepare("INSERT INTO recipe_shares (recipe_id, token) VALUES (?, ?)").bind(recipeId, token).run();
+            return new Response(JSON.stringify({ token: token }), { status: 201, headers: { 'Content-Type': 'application/json' } });
+        }
+    }
+
+    if (path === '/api/ratings' && request.method === 'POST') {
+        const { recipe_id, rating, notes } = await request.json<{ recipe_id: number; rating: number; notes: string; }>();
+        if (!recipe_id || !rating) {
+            return new Response('recipe_id and rating are required', { status: 400 });
+        }
+        await env.DB.prepare(
+            `INSERT INTO recipe_ratings (user_id, recipe_id, rating, notes) VALUES (?, ?, ?, ?)
+             ON CONFLICT(user_id, recipe_id) DO UPDATE SET rating = excluded.rating, notes = excluded.notes, updated_at = CURRENT_TIMESTAMP`
+        ).bind(userId, recipe_id, rating, notes || '').run();
+
+        return new Response(JSON.stringify({ success: true }), { status: 201 });
+    }
+
+    if (path === '/api/meal-log' && request.method === 'GET') {
+      const { results } = await env.DB.prepare(
+        "SELECT ml.eaten_date, r.name as recipe_name FROM meal_log ml JOIN recipes r ON ml.recipe_id = r.id WHERE ml.user_id = ? ORDER BY ml.eaten_date DESC"
+      ).bind(userId).all();
+      return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+    }
+    
+    if (path.startsWith('/api/meal-log') && request.method === 'POST') {
+        const { recipe_id, eaten_date, notes } = await request.json<{ recipe_id: number; eaten_date: string; notes: string; }>();
+        if (!recipe_id || !eaten_date) return new Response('recipe_id and eaten_date are required', { status: 400 });
+        await env.DB.prepare("INSERT INTO meal_log (recipe_id, eaten_date, user_id, notes) VALUES (?, ?, ?, ?)").bind(recipe_id, eaten_date, userId, notes).run();
+        return new Response(JSON.stringify({ success: true }), { status: 201 });
+    }
+    
+    if (path === '/api/shopping-list' && request.method === 'GET') {
+      const { results } = await env.DB.prepare(
+        "SELECT * FROM shopping_list WHERE user_id = ? ORDER BY recipe_name, id"
+      ).bind(userId).all();
+      return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path === '/api/shopping-list' && request.method === 'POST') {
+      const { items, recipe_name } = await request.json<{ items: { name: string; quantity: string; unit: string; }[]; recipe_name: string; }>();
+      if (!items || !Array.isArray(items) || items.length === 0 || !recipe_name) {
+        return new Response('A recipe_name and an array of items are required.', { status: 400 });
+      }
+      const stmt = env.DB.prepare("INSERT INTO shopping_list (user_id, ingredient_name, quantity, unit, recipe_name) VALUES (?, ?, ?, ?, ?)");
+      const batch = items.map(item => stmt.bind(userId, item.name, item.quantity, item.unit || '', recipe_name));
+      await env.DB.batch(batch);
+      return new Response(JSON.stringify({ success: true }), { status: 201 });
+    }
+
+    if (path === '/api/shopping-list/update' && request.method === 'PUT') {
+        const { updates } = await request.json<{ updates: { id: string; is_checked: boolean; }[] }>();
+        if (!updates || !Array.isArray(updates)) {
+            return new Response('An array of updates is required.', { status: 400 });
+        }
+        const stmt = env.DB.prepare("UPDATE shopping_list SET is_checked = ? WHERE id = ? AND user_id = ?");
+        const batch = updates.map(update => stmt.bind(update.is_checked ? 1 : 0, update.id, userId));
+        await env.DB.batch(batch);
+        return new Response(JSON.stringify({ success: true }));
+    }
+    
+    if (path === '/api/shopping-list/clear' && request.method === 'DELETE') {
+        await env.DB.prepare("DELETE FROM shopping_list WHERE user_id = ? AND is_checked = 1").bind(userId).run();
+        return new Response(JSON.stringify({ success: true }));
+    }
+
+    // Fallback for any other path - pass through to the static assets
+    return context.next();
+
+  } catch (e) {
+    console.error("Caught error in onRequest handler:", e);
+    return new Response('Internal Server Error', { status: 500 });
+  }
+};
+
+// Helper function to get user identity from Cloudflare Access
+async function getIdentity(request: Request): Promise<{ email: string } | null> {
+    try {
+        const identityUrl = `https://${new URL(request.url).hostname}/cdn-cgi/access/get-identity`;
+        const headers = new Headers();
+        headers.set('cookie', request.headers.get('cookie') || '');
+        
+        const res = await fetch(identityUrl, { headers });
+
+        if (!res.ok) {
+            console.error(`getIdentity failed with status: ${res.status} ${res.statusText}`);
+            const errorText = await res.text();
+            console.error(`getIdentity error response: ${errorText}`);
+            return null;
+        }
+        return await res.json();
+    } catch (e) {
+        console.error("Critical error in getIdentity fetch:", e);
+        return null;
+    }
+}
 
 

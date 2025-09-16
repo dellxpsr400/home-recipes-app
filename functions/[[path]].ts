@@ -4,6 +4,51 @@ interface Env {
   DB: D1Database;
 }
 
+// Helper function to render the read-only recipe share page
+function renderSharePage(recipe): Response {
+    const ingredientsHtml = JSON.parse(recipe.ingredients).map(section => `
+        <h3 class="text-xl font-semibold mt-4">${section.section_title}</h3>
+        <ul class="list-disc list-inside pl-4 mt-2">
+            ${section.items.map(ing => `<li>${ing.quantity || ''} ${ing.unit || ''} ${ing.name} ${ing.notes || ''}`.trim()).join('')}
+        </ul>
+    `).join('');
+
+    const instructionsHtml = JSON.parse(recipe.instructions).map(step => `
+        <li class="mb-2">${step}</li>
+    `).join('');
+
+    const html = `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>${recipe.name}</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body class="bg-gray-100 font-sans">
+            <div class="container mx-auto p-4 sm:p-8">
+                <div class="bg-white p-6 sm:p-8 rounded-lg shadow-lg max-w-2xl mx-auto">
+                    <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">${recipe.name}</h1>
+                    <div class="prose max-w-none">
+                        <h2 class="text-2xl font-bold text-gray-700 border-b pb-2">Ingredients</h2>
+                        ${ingredientsHtml}
+                        <h2 class="text-2xl font-bold text-gray-700 border-b pb-2 mt-6">Instructions</h2>
+                        <ol class="list-decimal list-inside pl-4 mt-2">
+                            ${instructionsHtml}
+                        </ol>
+                    </div>
+                    <p class="text-center text-gray-500 mt-8">Shared from the Home Recipes App</p>
+                </div>
+            </div>
+        </body>
+        </html>
+    `;
+
+    return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+}
+
+
 export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -11,6 +56,24 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // API Routing
   try {
+    // --- PUBLIC SHARE ROUTE ---
+    if (path.startsWith('/share/')) {
+        const token = path.split('/').pop();
+        if (!token) return new Response('Share token missing', { status: 400 });
+
+        // Find the recipe ID associated with the token
+        const share = await env.DB.prepare("SELECT recipe_id FROM recipe_shares WHERE token = ?").bind(token).first<{ recipe_id: number }>();
+        if (!share) return new Response('Recipe not found or share link is invalid', { status: 404 });
+
+        // Fetch the recipe details
+        const recipe = await env.DB.prepare("SELECT * FROM recipes WHERE id = ?").bind(share.recipe_id).first();
+        if (!recipe) return new Response('Recipe not found', { status: 404 });
+
+        // Render and return the HTML page
+        return renderSharePage(recipe);
+    }
+
+
     // --- PUBLIC API ROUTES (No login required) ---
     if (path.startsWith('/api/recipes/search')) {
       const query = url.searchParams.get('q');
@@ -19,13 +82,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const queryAsNumber = parseInt(query, 10);
       let results;
 
-      // Check if the query is a valid number
       if (!isNaN(queryAsNumber)) {
-        // If it is a number, search by ID OR by name (in case a recipe name is just a number)
         const stmt = env.DB.prepare("SELECT * FROM recipes WHERE id = ? OR name LIKE ?");
         ({ results } = await stmt.bind(queryAsNumber, `%${query}%`).all());
       } else {
-        // If it's not a number, search by name only
         const stmt = env.DB.prepare("SELECT * FROM recipes WHERE name LIKE ?");
         ({ results } = await stmt.bind(`%${query}%`).all());
       }
@@ -61,23 +121,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return new Response(JSON.stringify(Array.from(uniqueTags)), { headers: { 'Content-Type': 'application/json' } });
     }
     
-    // Get a single recipe by ID (publicly accessible, with extra data for logged-in users)
     if (path.match(/^\/api\/recipes\/\d+$/)) {
       const recipeId = path.split('/').pop();
       const recipe = await env.DB.prepare("SELECT * FROM recipes WHERE id = ?").bind(recipeId).first();
       if (!recipe) return new Response('Recipe not found', { status: 404 });
 
-      // Initialize payload with recipe data
       let responsePayload = { ...recipe, log_count: 0, user_rating: null, user_notes: null };
 
       const identity = await getIdentity(request);
       if (identity) {
           const userId = identity.email;
-          // Get meal log count
           const logCountResult = await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first<{ count: number }>();
           responsePayload.log_count = logCountResult?.count ?? 0;
 
-          // Get user rating and notes
           const ratingResult = await env.DB.prepare("SELECT rating, notes FROM recipe_ratings WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first<{ rating: number; notes: string }>();
           if (ratingResult) {
             responsePayload.user_rating = ratingResult.rating;
@@ -90,7 +146,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     
     // --- SECURE API ROUTES (Login required) ---
 
-    // Get user identity from the Access JWT. This is the security gate for all subsequent routes.
     const identity = await getIdentity(request);
     if (!identity) {
         if (path.startsWith('/api/')) {
@@ -100,14 +155,29 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
     const userId = identity.email;
 
-    // POST /api/ratings: Add or update a rating for a recipe
+    // POST /api/recipes/:id/share - Create a share link
+    if (path.match(/^\/api\/recipes\/\d+\/share$/) && request.method === 'POST') {
+        const recipeId = path.split('/')[3];
+        
+        // Check if a token already exists for this recipe
+        let share = await env.DB.prepare("SELECT token FROM recipe_shares WHERE recipe_id = ?").bind(recipeId).first<{ token: string }>();
+
+        if (share) {
+            // If a token exists, return it
+            return new Response(JSON.stringify({ token: share.token }), { headers: { 'Content-Type': 'application/json' } });
+        } else {
+            // If not, create a new unique token
+            const token = crypto.randomUUID();
+            await env.DB.prepare("INSERT INTO recipe_shares (recipe_id, token) VALUES (?, ?)").bind(recipeId, token).run();
+            return new Response(JSON.stringify({ token: token }), { status: 201, headers: { 'Content-Type': 'application/json' } });
+        }
+    }
+
     if (path === '/api/ratings' && request.method === 'POST') {
         const { recipe_id, rating, notes } = await request.json<{ recipe_id: number; rating: number; notes: string; }>();
         if (!recipe_id || !rating) {
             return new Response('recipe_id and rating are required', { status: 400 });
         }
-
-        // Upsert logic: Insert a new rating or update the existing one if it already exists.
         await env.DB.prepare(
             `INSERT INTO recipe_ratings (user_id, recipe_id, rating, notes) VALUES (?, ?, ?, ?)
              ON CONFLICT(user_id, recipe_id) DO UPDATE SET rating = excluded.rating, notes = excluded.notes, updated_at = CURRENT_TIMESTAMP`
@@ -116,7 +186,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return new Response(JSON.stringify({ success: true }), { status: 201 });
     }
 
-    // GET /api/meal-log: Fetch all meal log entries for the current user
     if (path === '/api/meal-log' && request.method === 'GET') {
       const { results } = await env.DB.prepare(
         "SELECT ml.eaten_date, r.name as recipe_name FROM meal_log ml JOIN recipes r ON ml.recipe_id = r.id WHERE ml.user_id = ? ORDER BY ml.eaten_date DESC"
@@ -124,7 +193,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
     
-    // Add a meal log entry
     if (path.startsWith('/api/meal-log') && request.method === 'POST') {
         const { recipe_id, eaten_date, notes } = await request.json<{ recipe_id: number; eaten_date: string; notes: string; }>();
         if (!recipe_id || !eaten_date) return new Response('recipe_id and eaten_date are required', { status: 400 });
@@ -132,9 +200,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return new Response(JSON.stringify({ success: true }), { status: 201 });
     }
     
-    // --- SHOPPING LIST ROUTES (Secure) ---
-
-    // GET /api/shopping-list: Fetch all items for the current user
     if (path === '/api/shopping-list' && request.method === 'GET') {
       const { results } = await env.DB.prepare(
         "SELECT * FROM shopping_list WHERE user_id = ? ORDER BY recipe_name, id"
@@ -142,22 +207,17 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    // POST /api/shopping-list: Add multiple items to the list
     if (path === '/api/shopping-list' && request.method === 'POST') {
       const { items, recipe_name } = await request.json<{ items: { name: string; quantity: string; unit: string; }[]; recipe_name: string; }>();
       if (!items || !Array.isArray(items) || items.length === 0 || !recipe_name) {
         return new Response('A recipe_name and an array of items are required.', { status: 400 });
       }
       const stmt = env.DB.prepare("INSERT INTO shopping_list (user_id, ingredient_name, quantity, unit, recipe_name) VALUES (?, ?, ?, ?, ?)");
-      const batch = items.map(item => {
-        const unitValue = item.unit || ''; // Use an empty string if unit is not provided
-        return stmt.bind(userId, item.name, item.quantity, unitValue, recipe_name);
-      });
+      const batch = items.map(item => stmt.bind(userId, item.name, item.quantity, item.unit || '', recipe_name));
       await env.DB.batch(batch);
       return new Response(JSON.stringify({ success: true }), { status: 201 });
     }
 
-    // PUT /api/shopping-list/update: Update the checked status of multiple items
     if (path === '/api/shopping-list/update' && request.method === 'PUT') {
         const { updates } = await request.json<{ updates: { id: string; is_checked: boolean; }[] }>();
         if (!updates || !Array.isArray(updates)) {
@@ -169,7 +229,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return new Response(JSON.stringify({ success: true }));
     }
     
-    // DELETE /api/shopping-list/clear: Delete all checked items
     if (path === '/api/shopping-list/clear' && request.method === 'DELETE') {
         await env.DB.prepare("DELETE FROM shopping_list WHERE user_id = ? AND is_checked = 1").bind(userId).run();
         return new Response(JSON.stringify({ success: true }));
