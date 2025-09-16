@@ -15,7 +15,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (path.startsWith('/api/recipes/search')) {
       const query = url.searchParams.get('q');
       if (!query) return new Response('Query parameter "q" is required', { status: 400 });
-      const { results } = await env.DB.prepare("SELECT * FROM recipes WHERE name LIKE ?").bind(`%${query}%`).all();
+
+      const queryAsNumber = parseInt(query, 10);
+      let results;
+
+      // Check if the query is a valid number
+      if (!isNaN(queryAsNumber)) {
+        // If it is a number, search by ID OR by name (in case a recipe name is just a number)
+        const stmt = env.DB.prepare("SELECT * FROM recipes WHERE id = ? OR name LIKE ?");
+        ({ results } = await stmt.bind(queryAsNumber, `%${query}%`).all());
+      } else {
+        // If it's not a number, search by name only
+        const stmt = env.DB.prepare("SELECT * FROM recipes WHERE name LIKE ?");
+        ({ results } = await stmt.bind(`%${query}%`).all());
+      }
+      
       return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
 

@@ -56,7 +56,7 @@
             <div id="search-container">
                 <!-- Search inputs - now responsive -->
                 <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
-                    <input type="text" id="search-by-name" placeholder="Search by recipe name..." class="p-2 border border-gray-300 rounded-md w-full sm:w-1/2">
+                    <input type="text" id="search-by-name" placeholder="Search by name or number..." class="p-2 border border-gray-300 rounded-md w-full sm:w-1/2">
                     <input type="text" id="search-by-ingredients" placeholder="Search by ingredients (e.g., chicken, tomato)..." class="p-2 border border-gray-300 rounded-md w-full sm:w-1/2">
                 </div>
                 <div class="flex justify-end mb-4">
@@ -149,15 +149,12 @@
                     // --- EDIT THIS MAP ---
                     // Map user emails to the friendly names you want to display.
                     const nameMap = {
-                        'nicolasj.oliver@gmail.com': 'Nick',   // Replace with Nick's actual email
-                        'rachelcasey246@gmail.com': 'Rach',   // Replace with Rach's actual email
-                        'rosieoliver168@gmail.com': 'Rosie'  // Replace with Rosie's actual email
+                        'nicolasj.oliver@gmail.com': 'Nick',
+                        'rachelcasey246@gmail.com': 'Rach',
+                        'rosieoliver168@gmail.com': 'Rosie'
                     };
 
-                    // Look for a friendly name in the map.
-                    // If not found, fall back to the username part of the email.
                     const friendlyName = nameMap[currentUserEmail] || currentUserEmail.split('@')[0];
-                    
                     userGreeting.textContent = `Hello, ${friendlyName}!`;
                 } else { 
                     userGreeting.textContent = 'Welcome!'; 
@@ -218,7 +215,7 @@
             const searchResultsContainer = document.getElementById('search-results');
             const clearSearchBtn = document.getElementById('clear-search-btn');
 
-            searchByNameInput.addEventListener('input', debounce(() => searchRecipes('name', searchByNameInput.value), 300));
+            searchByNameInput.addEventListener('input', debounce(() => searchRecipes('nameOrId', searchByNameInput.value), 300));
             searchByIngredientsInput.addEventListener('input', debounce(() => searchRecipes('ingredients', searchByIngredientsInput.value), 300));
             
             clearSearchBtn.addEventListener('click', () => {
@@ -231,7 +228,7 @@
             async function searchRecipes(type, query) {
                 if (!query || query.length < 1) { searchResultsContainer.innerHTML = ''; return; }
                 let endpoint = '';
-                if (type === 'name') {
+                if (type === 'nameOrId') {
                     endpoint = `/api/recipes/search?q=${query}`;
                 } else if (type === 'ingredients') {
                     endpoint = `/api/recipes/ingredients?q=${query}`;
