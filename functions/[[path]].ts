@@ -67,16 +67,24 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const recipe = await env.DB.prepare("SELECT * FROM recipes WHERE id = ?").bind(recipeId).first();
       if (!recipe) return new Response('Recipe not found', { status: 404 });
 
-      // Now, TRY to get user-specific data
-      let logCount = 0;
+      // Initialize payload with recipe data
+      let responsePayload = { ...recipe, log_count: 0, user_rating: null, user_notes: null };
+
       const identity = await getIdentity(request);
       if (identity) {
           const userId = identity.email;
+          // Get meal log count
           const logCountResult = await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first<{ count: number }>();
-          logCount = logCountResult?.count ?? 0;
+          responsePayload.log_count = logCountResult?.count ?? 0;
+
+          // Get user rating and notes
+          const ratingResult = await env.DB.prepare("SELECT rating, notes FROM recipe_ratings WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first<{ rating: number; notes: string }>();
+          if (ratingResult) {
+            responsePayload.user_rating = ratingResult.rating;
+            responsePayload.user_notes = ratingResult.notes;
+          }
       }
       
-      const responsePayload = { ...recipe, log_count: logCount };
       return new Response(JSON.stringify(responsePayload), { headers: { 'Content-Type': 'application/json' } });
     }
     
@@ -91,6 +99,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return context.next();
     }
     const userId = identity.email;
+
+    // POST /api/ratings: Add or update a rating for a recipe
+    if (path === '/api/ratings' && request.method === 'POST') {
+        const { recipe_id, rating, notes } = await request.json<{ recipe_id: number; rating: number; notes: string; }>();
+        if (!recipe_id || !rating) {
+            return new Response('recipe_id and rating are required', { status: 400 });
+        }
+
+        // Upsert logic: Insert a new rating or update the existing one if it already exists.
+        await env.DB.prepare(
+            `INSERT INTO recipe_ratings (user_id, recipe_id, rating, notes) VALUES (?, ?, ?, ?)
+             ON CONFLICT(user_id, recipe_id) DO UPDATE SET rating = excluded.rating, notes = excluded.notes, updated_at = CURRENT_TIMESTAMP`
+        ).bind(userId, recipe_id, rating, notes || '').run();
+
+        return new Response(JSON.stringify({ success: true }), { status: 201 });
+    }
 
     // GET /api/meal-log: Fetch all meal log entries for the current user
     if (path === '/api/meal-log' && request.method === 'GET') {

@@ -28,6 +28,24 @@
         }
         .toast.success { background-color: #28a745; }
         .toast.error { background-color: #dc3545; }
+        /* Star rating styles */
+        .star-rating {
+            display: flex;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+            font-size: 2.5em;
+            cursor: pointer;
+        }
+        .star-rating input { display: none; }
+        .star-rating label {
+            color: #ddd;
+            transition: color 0.2s;
+        }
+        .star-rating input:checked ~ label,
+        .star-rating label:hover,
+        .star-rating label:hover ~ label {
+            color: #fcd34d; /* Tailwind yellow-300 */
+        }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -155,16 +173,17 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', async function () {
+            let currentUserEmail = null;
+
             // --- User Info ---
             const userGreeting = document.getElementById('user-greeting');
             try {
                 const identityRes = await fetch('/cdn-cgi/access/get-identity');
                 if (identityRes.ok) {
                     const identity = await identityRes.json();
-                    const currentUserEmail = identity.email;
+                    currentUserEmail = identity.email;
 
                     // --- EDIT THIS MAP ---
-                    // Map user emails to the friendly names you want to display.
                     const nameMap = {
                         'nicolasj.oliver@gmail.com': 'Nick',
                         'rachelcasey246@gmail.com': 'Rach',
@@ -272,10 +291,13 @@
             
             async function showRecipeDetails(recipeId) {
                 const response = await fetch(`/api/recipes/${recipeId}`);
+                if (!response.ok) {
+                    showToast('Could not load recipe details.', 'error');
+                    return;
+                }
                 const recipe = await response.json();
                 recipeModalTitle.textContent = `(${recipe.id}) ${recipe.name}`;
 
-                // --- REVERTED: Simplified JSON parsing for ingredients ---
                 let ingredientsHtml = '<h4>Ingredients:</h4>';
                 try {
                     const ingredientsData = JSON.parse(recipe.ingredients);
@@ -304,25 +326,79 @@
                     instructionsHtml = `<p class="whitespace-pre-wrap">${recipe.instructions}</p>`;
                 }
 
+                // --- NEW: Ratings & Notes Section ---
+                const ratingsSectionHtml = `
+                    <div class="border-t mt-4 pt-4">
+                        <h4 class="font-bold">Your Rating & Notes</h4>
+                        <div class="star-rating my-2">
+                            <input type="radio" id="5-stars" name="rating" value="5" /><label for="5-stars">★</label>
+                            <input type="radio" id="4-stars" name="rating" value="4" /><label for="4-stars">★</label>
+                            <input type="radio" id="3-stars" name="rating" value="3" /><label for="3-stars">★</label>
+                            <input type="radio" id="2-stars" name="rating" value="2" /><label for="2-stars">★</label>
+                            <input type="radio" id="1-star" name="rating" value="1" /><label for="1-star">★</label>
+                        </div>
+                        <textarea id="recipe-notes" class="w-full p-2 border border-gray-300 rounded-md" rows="4" placeholder="Add your personal notes here..."></textarea>
+                        <div class="text-right mt-2">
+                            <button id="save-rating-btn" data-recipe-id="${recipe.id}" class="bg-purple-500 hover:bg-purple-700 text-white p-2 rounded">Save Rating & Notes</button>
+                        </div>
+                    </div>`;
+
                 recipeModalContent.innerHTML = `
                     ${ingredientsHtml}
                     <div class="text-right mt-4">
                         <button id="add-to-list-btn" data-recipe-name="${recipe.name}" class="bg-green-500 text-white p-2 rounded">Add Selected to Shopping List</button>
                     </div>
                     ${instructionsHtml}
-                    <h4 class="font-bold mt-4">Meal Log:</h4>
-                    <p>You have logged this meal ${recipe.log_count} time(s).</p>
-                    <div class="mt-4">
-                        <label for="eaten-date">Log this meal:</label>
-                        <input type="date" id="eaten-date" class="border p-1 rounded">
-                        <button id="log-meal-btn" data-recipe-id="${recipe.id}" class="bg-blue-500 text-white p-2 rounded ml-2">Log Meal</button>
-                    </div>`;
+                    <div class="border-t mt-4 pt-4">
+                        <h4 class="font-bold">Meal Log:</h4>
+                        <p>You have logged this meal ${recipe.log_count} time(s).</p>
+                        <div class="mt-2">
+                            <label for="eaten-date">Log this meal:</label>
+                            <input type="date" id="eaten-date" class="border p-1 rounded">
+                            <button id="log-meal-btn" data-recipe-id="${recipe.id}" class="bg-blue-500 text-white p-2 rounded ml-2">Log Meal</button>
+                        </div>
+                    </div>
+                    ${currentUserEmail ? ratingsSectionHtml : '<p class="mt-4 pt-4 border-t">Log in to add your own ratings and notes.</p>'}`;
+
+                // Populate existing rating and notes if they exist
+                if (currentUserEmail && recipe.user_rating) {
+                    const starInput = document.querySelector(`.star-rating input[value="${recipe.user_rating}"]`);
+                    if (starInput) starInput.checked = true;
+                }
+                if (currentUserEmail && recipe.user_notes) {
+                    document.getElementById('recipe-notes').value = recipe.user_notes;
+                }
+
                 toggleModal(recipeModal, true);
                 
                 document.getElementById('add-to-list-btn').addEventListener('click', handleAddToList);
                 document.getElementById('log-meal-btn').addEventListener('click', handleLogMeal);
+                if (currentUserEmail) {
+                    document.getElementById('save-rating-btn').addEventListener('click', handleSaveRating);
+                }
             }
             
+            async function handleSaveRating(e) {
+                const recipeId = e.target.dataset.recipeId;
+                const ratingInput = document.querySelector('.star-rating input:checked');
+                const rating = ratingInput ? ratingInput.value : null;
+                const notes = document.getElementById('recipe-notes').value;
+
+                if (!rating) {
+                    showToast('Please select a star rating.', 'error');
+                    return;
+                }
+
+                await fetch('/api/ratings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipe_id: recipeId, rating: parseInt(rating), notes: notes }),
+                });
+
+                showToast('Rating and notes saved!', 'success');
+                toggleModal(recipeModal, false);
+            }
+
             async function handleAddToList(e) {
                 const recipeName = e.target.dataset.recipeName;
                 const selectedCheckboxes = document.querySelectorAll('.ingredient-checkbox:checked');
@@ -530,4 +606,5 @@
     </script>
 </body>
 </html>
+
 
