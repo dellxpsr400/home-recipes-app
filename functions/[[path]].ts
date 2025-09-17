@@ -4,8 +4,10 @@ interface Env {
   DB: D1Database;
 }
 
-// This captures the timestamp when the function is initialized during deployment.
+// This captures the timestamp when the function is first initialized after a new deployment.
+// This value will remain constant for the lifetime of this specific deployment.
 const buildTimestamp = new Date().toISOString();
+
 
 // Helper function to render the read-only recipe share page
 function renderSharePage(recipe: any): Response {
@@ -25,7 +27,7 @@ function renderSharePage(recipe: any): Response {
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale-1.0">
         <title>${recipe.name}</title>
         <script src="https://cdn.tailwindcss.com"></script>
     </head>
@@ -73,8 +75,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return renderSharePage(recipe);
     }
 
-    // --- NEW PUBLIC BUILD INFO ROUTE ---
+    // --- PUBLIC BUILD INFO ROUTE ---
     if (path === '/api/build-info') {
+        // MODIFIED: Return the static deployment timestamp captured when the function was initialized.
         return new Response(JSON.stringify({ timestamp: buildTimestamp }), {
             headers: { 'Content-Type': 'application/json' }
         });
