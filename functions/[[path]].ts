@@ -4,10 +4,8 @@ interface Env {
   DB: D1Database;
 }
 
-// This captures the timestamp when the function is first initialized after a new deployment.
-// This value will remain constant for the lifetime of this specific deployment.
-const buildTimestamp = new Date().toISOString();
-
+// NOTE: The unreliable top-level buildTimestamp constant has been removed
+// to be replaced with a reliable live timestamp in the handler.
 
 // Helper function to render the read-only recipe share page
 function renderSharePage(recipe: any): Response {
@@ -77,8 +75,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // --- PUBLIC BUILD INFO ROUTE ---
     if (path === '/api/build-info') {
-        // MODIFIED: Return the static deployment timestamp captured when the function was initialized.
-        return new Response(JSON.stringify({ timestamp: buildTimestamp }), {
+        // Return the current server time on each request. This acts as a reliable
+        // "live status indicator" to confirm a new deployment is active.
+        return new Response(JSON.stringify({ timestamp: new Date().toISOString() }), {
             headers: { 'Content-Type': 'application/json' }
         });
     }
