@@ -4,34 +4,6 @@ interface Env {
   DB: D1Database;
 }
 
-// Helper function to render a simple, static HTML page for testing the share route.
-function renderShareTestPage(): Response {
-  const html = `
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Share Test</title>
-        <style>
-            body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f2f5; margin: 0; }
-            .container { text-align: center; padding: 2rem; background-color: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-            h1 { color: #1a73e8; }
-            p { color: #5f6368; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>Share Test Successful</h1>
-            <p>If you can see this page, your routing and Access policies are working correctly.</p>
-        </div>
-    </body>
-    </html>
-  `;
-  return new Response(html, { headers: { 'Content-Type': 'text/html' } });
-}
-
-
 // Helper function to render the read-only recipe share page
 function renderSharePage(recipe: any): Response {
     const ingredientsHtml = JSON.parse(recipe.ingredients).map((section: any) => `
@@ -81,10 +53,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   // API Routing
   try {
-    // --- SIMPLIFIED PUBLIC SHARE ROUTE FOR TESTING ---
+    // --- PUBLIC SHARE ROUTE ---
     if (path.startsWith('/share/')) {
-        return renderShareTestPage();
+        const token = path.split('/').pop();
+        if (!token) return new Response('Share token missing', { status: 400 });
+
+        // Find the recipe ID associated with the token
+        const share = await env.DB.prepare("SELECT recipe_id FROM recipe_shares WHERE token = ?").bind(token).first<{ recipe_id: number }>();
+        if (!share) return new Response('Recipe not found or share link is invalid', { status: 404 });
+
+        // Fetch the recipe details
+        const recipe = await env.DB.prepare("SELECT * FROM recipes WHERE id = ?").bind(share.recipe_id).first();
+        if (!recipe) return new Response('Recipe not found', { status: 404 });
+
+        // Render and return the HTML page
+        return renderSharePage(recipe);
     }
+
 
     // --- PUBLIC API ROUTES (No login required) ---
     if (path.startsWith('/api/recipes/search')) {
@@ -273,8 +258,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 // Helper function to get user identity from Cloudflare Access
 async function getIdentity(request: Request): Promise<{ email: string } | null> {
     try {
-        const identityUrl = `https://${new URL(request.url).hostname}/cdn-cgi/access-identity`;
-        const headers = new Headers(request.headers);
+        // CORRECTED URL
+        const identityUrl = `https://${new URL(request.url).hostname}/cdn-cgi/access/get-identity`;
+        const headers = new Headers();
+        headers.set('cookie', request.headers.get('cookie') || '');
         
         const res = await fetch(identityUrl, { headers });
 
@@ -290,5 +277,4 @@ async function getIdentity(request: Request): Promise<{ email: string } | null> 
         return null;
     }
 }
-
 
