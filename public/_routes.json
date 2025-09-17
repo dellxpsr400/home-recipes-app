@@ -1,7 +1,11 @@
 {
   "version": 1,
   "include": [
-    "/api/*"
+    "/api/*",
+    "/share/*"
   ],
-  "exclude": []
+  "exclude": [
+    "/favicon.ico",
+    "/assets/*"
+  ]
 }
