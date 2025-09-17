@@ -4,6 +4,9 @@ interface Env {
   DB: D1Database;
 }
 
+// This captures the timestamp when the function is initialized during deployment.
+const buildTimestamp = new Date().toISOString();
+
 // Helper function to render the read-only recipe share page
 function renderSharePage(recipe: any): Response {
     const ingredientsHtml = JSON.parse(recipe.ingredients).map((section: any) => `
@@ -68,6 +71,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
         // Render and return the HTML page
         return renderSharePage(recipe);
+    }
+
+    // --- NEW PUBLIC BUILD INFO ROUTE ---
+    if (path === '/api/build-info') {
+        return new Response(JSON.stringify({ timestamp: buildTimestamp }), {
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 
 
