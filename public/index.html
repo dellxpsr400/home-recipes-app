@@ -204,26 +204,42 @@
         <div class="modal-container bg-white w-11/12 md:max-w-6xl mx-auto rounded shadow-lg z-50 overflow-y-auto" style="max-height: 90vh;">
             <div class="modal-content py-4 text-left px-6">
                 <div class="flex justify-between items-center pb-3">
-                    <p class="text-2xl font-bold">Meal Planner</p>
+                    <p id="meal-planner-title" class="text-2xl font-bold">Meal Planner</p>
                     <div class="modal-close cursor-pointer z-50">
                          <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
                     </div>
                 </div>
-                <div id="meal-planner-content" class="space-y-4">
-                    <!-- New Meal Plan Form -->
-                    <div class="bg-gray-100 p-4 rounded-lg">
-                        <h3 class="text-lg font-semibold mb-2">Create a New Meal Plan</h3>
-                        <div class="flex space-x-2">
-                            <input type="text" id="new-plan-name" placeholder="e.g., This Week's Dinners" class="p-2 border border-gray-300 rounded-md flex-grow">
-                            <button id="create-plan-btn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Create Plan</button>
+                <div id="meal-planner-content">
+                    <!-- View for managing plans -->
+                    <div id="plan-management-view">
+                        <div class="bg-gray-100 p-4 rounded-lg mb-4">
+                            <h3 class="text-lg font-semibold mb-2">Create a New Meal Plan</h3>
+                            <div class="flex space-x-2">
+                                <input type="text" id="new-plan-name" placeholder="e.g., This Week's Dinners" class="p-2 border border-gray-300 rounded-md flex-grow">
+                                <button id="create-plan-btn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Create Plan</button>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold mb-2">Your Meal Plans</h3>
+                            <div id="meal-plans-list" class="space-y-2"></div>
                         </div>
                     </div>
-                    <!-- List of Existing Meal Plans -->
-                    <div>
-                        <h3 class="text-lg font-semibold mb-2">Your Meal Plans</h3>
-                        <div id="meal-plans-list" class="space-y-2">
-                            <!-- Meal plans will be dynamically inserted here -->
+
+                    <!-- View for the calendar -->
+                    <div id="plan-calendar-view" class="hidden">
+                        <button id="back-to-plans-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mb-4">← Back to Plans</button>
+                        <div class="grid grid-cols-7 gap-2 text-center">
+                            <!-- Calendar headers -->
+                            <div class="font-bold">Monday</div>
+                            <div class="font-bold">Tuesday</div>
+                            <div class="font-bold">Wednesday</div>
+                            <div class="font-bold">Thursday</div>
+                            <div class="font-bold">Friday</div>
+                            <div class="font-bold">Saturday</div>
+                            <div class="font-bold">Sunday</div>
+                            <!-- Calendar body will be populated by JS -->
                         </div>
+                         <div id="calendar-body" class="grid grid-cols-7 gap-2 mt-2"></div>
                     </div>
                 </div>
             </div>
@@ -234,6 +250,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', async function () {
             let currentUserEmail = null;
+            let currentMealPlan = null;
 
             // --- User Info ---
             const userGreeting = document.getElementById('user-greeting');
@@ -623,17 +640,31 @@
             // --- Meal Planner Functionality ---
             const mealPlannerModal = document.getElementById('meal-planner-modal');
             const mealPlannerButton = document.getElementById('meal-planner-button');
+            const mealPlannerTitle = document.getElementById('meal-planner-title');
+            const planManagementView = document.getElementById('plan-management-view');
+            const planCalendarView = document.getElementById('plan-calendar-view');
             const mealPlansList = document.getElementById('meal-plans-list');
             const newPlanNameInput = document.getElementById('new-plan-name');
             const createPlanBtn = document.getElementById('create-plan-btn');
+            const backToPlansBtn = document.getElementById('back-to-plans-btn');
+            const calendarBody = document.getElementById('calendar-body');
 
             mealPlannerButton.addEventListener('click', showMealPlanner);
+
+            backToPlansBtn.addEventListener('click', () => {
+                planCalendarView.classList.add('hidden');
+                planManagementView.classList.remove('hidden');
+                mealPlannerTitle.textContent = 'Meal Planner';
+            });
 
             async function showMealPlanner() {
                 if (!currentUserEmail) {
                     showToast('Please log in to use the Meal Planner.', 'error');
                     return;
                 }
+                planCalendarView.classList.add('hidden');
+                planManagementView.classList.remove('hidden');
+                mealPlannerTitle.textContent = 'Meal Planner';
                 toggleModal(mealPlannerModal, true);
                 const response = await fetch('/api/meal-plans');
                 const plans = await response.json();
@@ -650,11 +681,49 @@
                     const planElement = document.createElement('div');
                     planElement.className = 'bg-white p-3 rounded-md shadow cursor-pointer hover:bg-gray-100';
                     planElement.textContent = plan.name;
-                    planElement.addEventListener('click', () => {
-                        // In the next step, this will load the calendar view for this plan
-                        showToast(`Selected plan: ${plan.name}`, 'success');
-                    });
+                    planElement.addEventListener('click', () => loadPlanCalendar(plan));
                     mealPlansList.appendChild(planElement);
+                });
+            }
+            
+            async function loadPlanCalendar(plan) {
+                currentMealPlan = plan;
+                mealPlannerTitle.textContent = plan.name;
+                planManagementView.classList.add('hidden');
+                planCalendarView.classList.remove('hidden');
+
+                const response = await fetch(`/api/meal-plans/${plan.id}`);
+                const planDetails = await response.json();
+                renderCalendar(planDetails.recipes);
+            }
+            
+            function renderCalendar(plannedRecipes) {
+                calendarBody.innerHTML = '';
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                const mealTimes = ['Breakfast', 'Lunch', 'Dinner'];
+
+                days.forEach(day => {
+                    const dayCell = document.createElement('div');
+                    dayCell.className = 'border p-2 min-h-[200px]';
+                    
+                    mealTimes.forEach(mealTime => {
+                        const mealSlot = document.createElement('div');
+                        mealSlot.className = 'mb-2';
+                        mealSlot.innerHTML = `<h4 class="font-semibold text-sm border-b mb-1">${mealTime}</h4>`;
+                        
+                        const recipesForSlot = plannedRecipes.filter(r => r.day_of_week === day && r.meal_time === mealTime);
+                        
+                        const recipeList = document.createElement('div');
+                        recipesForSlot.forEach(r => {
+                            const recipeItem = document.createElement('div');
+                            recipeItem.className = 'bg-blue-100 p-1 rounded text-xs';
+                            recipeItem.textContent = r.recipe_name;
+                            recipeList.appendChild(recipeItem);
+                        });
+                        mealSlot.appendChild(recipeList);
+                        dayCell.appendChild(mealSlot);
+                    });
+                    calendarBody.appendChild(dayCell);
                 });
             }
 
@@ -672,7 +741,6 @@
                 if (response.ok) {
                     newPlanNameInput.value = '';
                     showToast('New meal plan created!', 'success');
-                    // Refresh the list
                     const plansResponse = await fetch('/api/meal-plans');
                     const plans = await plansResponse.json();
                     renderMealPlansList(plans);
