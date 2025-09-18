@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meal Planner</title>
+    <link rel="stylesheet" href="https://unpkg.com/simpledotcss/simple.css">
+    <style>
+        .planner-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1rem; }
+        .day-column { border: 1px solid #ccc; padding: 0.5rem; border-radius: 5px; }
+        .meal-slot { border-top: 1px dashed #eee; padding: 0.5rem; }
+        .meal-slot h5 { margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>My Meal Planner</h1>
+        <p><a href="/">Back to Recipes</a></p>
+    </header>
+
+    <main>
+        <h2>Create or Select a Plan</h2>
+        <div id="plan-manager">
+            <input type="text" id="new-plan-name" placeholder="e.g., Week of Sept 22nd">
+            <button id="create-plan-btn">Create New Plan</button>
+        </div>
+        <div id="plan-list">
+            </div>
+
+        <hr>
+
+        <div id="planner-view" style="display:none;">
+            <h2 id="current-plan-name"></h2>
+            <div id="planner-grid" class="planner-grid">
+                </div>
+        </div>
+    </main>
+
+    <script src="/planner.js"></script>
+</body>
+</html>

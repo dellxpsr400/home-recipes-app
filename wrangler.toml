@@ -1,17 +1,13 @@
-
 name = "home-recipes-app-github"
+main = "src/index.ts" # Tells `wrangler dev` where your API code is
 compatibility_date = "2023-10-30"
 
-# This section is crucial for Cloudflare Pages to correctly build your functions.
-# It tells the build system where to find the static assets (your public directory)
-# and instructs it to build any functions it finds.
-[pages_build_config]
-build_output_dir = "public"
-build_command = ""
+# Tells `wrangler dev` where your static HTML/JS files are
+[site]
+bucket = "./public"
 
-# D1 database binding for your production environment.
+# Your existing D1 database binding - no changes needed here
 [[d1_databases]]
 binding = "DB"
 database_name = "recipes-db"
 database_id = "45c9bc04-bafb-4ea7-9926-9de33ac06e32"
-
