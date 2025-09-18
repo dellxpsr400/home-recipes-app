@@ -3,6 +3,7 @@
 -- Table for the overall meal plans
 CREATE TABLE IF NOT EXISTS meal_plans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL, -- Ensures each user has their own meal plans
     name TEXT NOT NULL, -- e.g., "Week of Sept 16th"
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

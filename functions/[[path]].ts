@@ -4,8 +4,9 @@ interface Env {
   DB: D1Database;
 }
 
-// NOTE: The unreliable top-level buildTimestamp constant has been removed
-// to be replaced with a reliable live timestamp in the handler.
+// This captures the timestamp when the function is first initialized after a new deployment.
+const buildTimestamp = new Date().toISOString();
+
 
 // Helper function to render the read-only recipe share page
 function renderSharePage(recipe: any): Response {
@@ -25,7 +26,7 @@ function renderSharePage(recipe: any): Response {
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale-1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>${recipe.name}</title>
         <script src="https://cdn.tailwindcss.com"></script>
     </head>
@@ -75,9 +76,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // --- PUBLIC BUILD INFO ROUTE ---
     if (path === '/api/build-info') {
-        // Return the current server time on each request. This acts as a reliable
-        // "live status indicator" to confirm a new deployment is active.
-        return new Response(JSON.stringify({ timestamp: new Date().toISOString() }), {
+        return new Response(JSON.stringify({ timestamp: buildTimestamp }), {
             headers: { 'Content-Type': 'application/json' }
         });
     }
@@ -168,14 +167,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
      // POST /api/recipes/:id/share - Create a share link
     if (path.match(/^\/api\/recipes\/\d+\/share$/) && request.method === 'POST') {
         const recipeId = path.split('/')[3];
-        // Check if a token already exists for this recipe to avoid creating duplicates
         let share = await env.DB.prepare("SELECT token FROM recipe_shares WHERE recipe_id = ?").bind(recipeId).first<{ token: string }>();
 
         if (share) {
-            // If a token exists, return it
             return new Response(JSON.stringify({ token: share.token }), { headers: { 'Content-Type': 'application/json' } });
         } else {
-            // If not, create a new unique token
             const token = crypto.randomUUID();
             await env.DB.prepare("INSERT INTO recipe_shares (recipe_id, token) VALUES (?, ?)").bind(recipeId, token).run();
             return new Response(JSON.stringify({ token: token }), { status: 201, headers: { 'Content-Type': 'application/json' } });
@@ -189,8 +185,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (!recipe_id || !rating) {
             return new Response('recipe_id and rating are required', { status: 400 });
         }
-
-        // Use INSERT ... ON CONFLICT to either create a new rating or update an existing one.
         await env.DB.prepare(
           `INSERT INTO recipe_ratings (user_id, recipe_id, rating, notes) VALUES (?, ?, ?, ?)
            ON CONFLICT(user_id, recipe_id) DO UPDATE SET rating = excluded.rating, notes = excluded.notes, updated_at = CURRENT_TIMESTAMP`
@@ -199,7 +193,63 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return new Response(JSON.stringify({ success: true }), { status: 201 });
     }
 
-    // GET /api/meal-log: Fetch all meal log entries for the current user
+    // --- MEAL PLANNER ROUTES ---
+    // GET /api/meal-plans - Get all meal plans for the user
+    if (path === '/api/meal-plans' && request.method === 'GET') {
+        const { results } = await env.DB.prepare("SELECT * FROM meal_plans WHERE user_id = ? ORDER BY created_at DESC").bind(userId).all();
+        return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // POST /api/meal-plans - Create a new meal plan
+    if (path === '/api/meal-plans' && request.method === 'POST') {
+        const { name } = await request.json<{ name: string }>();
+        if (!name) return new Response('Meal plan name is required', { status: 400 });
+        const { meta } = await env.DB.prepare("INSERT INTO meal_plans (user_id, name) VALUES (?, ?)").bind(userId, name).run();
+        return new Response(JSON.stringify({ success: true, id: meta.last_row_id }), { status: 201 });
+    }
+
+    // GET /api/meal-plans/:id - Get a single meal plan with its recipes
+    if (path.match(/^\/api\/meal-plans\/\d+$/) && request.method === 'GET') {
+        const planId = path.split('/').pop();
+        const plan = await env.DB.prepare("SELECT * FROM meal_plans WHERE id = ? AND user_id = ?").bind(planId, userId).first();
+        if (!plan) return new Response('Meal plan not found', { status: 404 });
+        
+        const { results: recipes } = await env.DB.prepare(
+            `SELECT mpr.*, r.name as recipe_name 
+             FROM meal_plan_recipes mpr 
+             JOIN recipes r ON mpr.recipe_id = r.id 
+             WHERE mpr.meal_plan_id = ?`
+        ).bind(planId).all();
+
+        return new Response(JSON.stringify({ ...plan, recipes }), { headers: { 'Content-Type': 'application/json' } });
+    }
+    
+    // POST /api/meal-plan-recipes - Add a recipe to a meal plan
+    if (path === '/api/meal-plan-recipes' && request.method === 'POST') {
+        const { meal_plan_id, recipe_id, day_of_week, meal_time } = await request.json<{ meal_plan_id: number; recipe_id: number; day_of_week: string; meal_time: string; }>();
+        if (!meal_plan_id || !recipe_id || !day_of_week || !meal_time) {
+            return new Response('All fields are required', { status: 400 });
+        }
+        await env.DB.prepare(
+            `INSERT INTO meal_plan_recipes (meal_plan_id, recipe_id, day_of_week, meal_time) VALUES (?, ?, ?, ?)`
+        ).bind(meal_plan_id, recipe_id, day_of_week, meal_time).run();
+        return new Response(JSON.stringify({ success: true }), { status: 201 });
+    }
+
+    // DELETE /api/meal-plan-recipes/:id - Remove a recipe from a meal plan
+    if (path.match(/^\/api\/meal-plan-recipes\/\d+$/) && request.method === 'DELETE') {
+        const recipePlanId = path.split('/').pop();
+        // We need to verify the user owns the plan this recipe is being deleted from.
+        await env.DB.prepare(
+            `DELETE FROM meal_plan_recipes 
+             WHERE id = ? 
+             AND meal_plan_id IN (SELECT id FROM meal_plans WHERE user_id = ?)`
+        ).bind(recipePlanId, userId).run();
+        return new Response(JSON.stringify({ success: true }));
+    }
+
+
+    // --- MEAL LOG ROUTES ---
     if (path === '/api/meal-log' && request.method === 'GET') {
       const { results } = await env.DB.prepare(
         "SELECT ml.eaten_date, r.name as recipe_name FROM meal_log ml JOIN recipes r ON ml.recipe_id = r.id WHERE ml.user_id = ? ORDER BY ml.eaten_date DESC"
@@ -207,7 +257,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
     
-    // Add a meal log entry
     if (path.startsWith('/api/meal-log') && request.method === 'POST') {
         const { recipe_id, eaten_date, notes } = await request.json<{ recipe_id: number; eaten_date: string; notes: string; }>();
         if (!recipe_id || !eaten_date) return new Response('recipe_id and eaten_date are required', { status: 400 });
@@ -216,8 +265,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
     
     // --- SHOPPING LIST ROUTES (Secure) ---
-
-    // GET /api/shopping-list: Fetch all items for the current user
     if (path === '/api/shopping-list' && request.method === 'GET') {
       const { results } = await env.DB.prepare(
         "SELECT * FROM shopping_list WHERE user_id = ? ORDER BY recipe_name, id"
@@ -225,22 +272,17 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    // POST /api/shopping-list: Add multiple items to the list
     if (path === '/api/shopping-list' && request.method === 'POST') {
       const { items, recipe_name } = await request.json<{ items: { name: string; quantity: string; unit: string; }[]; recipe_name: string; }>();
       if (!items || !Array.isArray(items) || items.length === 0 || !recipe_name) {
         return new Response('A recipe_name and an array of items are required.', { status: 400 });
       }
       const stmt = env.DB.prepare("INSERT INTO shopping_list (user_id, ingredient_name, quantity, unit, recipe_name) VALUES (?, ?, ?, ?, ?)");
-      const batch = items.map(item => {
-        const unitValue = item.unit || ''; // Use an empty string if unit is not provided
-        return stmt.bind(userId, item.name, item.quantity, unitValue, recipe_name);
-      });
+      const batch = items.map(item => stmt.bind(userId, item.name, item.quantity, item.unit || '', recipe_name));
       await env.DB.batch(batch);
       return new Response(JSON.stringify({ success: true }), { status: 201 });
     }
 
-    // PUT /api/shopping-list/update: Update the checked status of multiple items
     if (path === '/api/shopping-list/update' && request.method === 'PUT') {
         const { updates } = await request.json<{ updates: { id: string; is_checked: boolean; }[] }>();
         if (!updates || !Array.isArray(updates)) {
@@ -252,7 +294,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return new Response(JSON.stringify({ success: true }));
     }
     
-    // DELETE /api/shopping-list/clear: Delete all checked items
     if (path === '/api/shopping-list/clear' && request.method === 'DELETE') {
         await env.DB.prepare("DELETE FROM shopping_list WHERE user_id = ? AND is_checked = 1").bind(userId).run();
         return new Response(JSON.stringify({ success: true }));
@@ -270,7 +311,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 // Helper function to get user identity from Cloudflare Access
 async function getIdentity(request: Request): Promise<{ email: string } | null> {
     try {
-        // CORRECTED URL
         const identityUrl = `https://${new URL(request.url).hostname}/cdn-cgi/access/get-identity`;
         const headers = new Headers();
         headers.set('cookie', request.headers.get('cookie') || '');
