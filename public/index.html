@@ -210,8 +210,21 @@
                     </div>
                 </div>
                 <div id="meal-planner-content" class="space-y-4">
-                    <!-- Meal planner UI will be built here -->
-                    <p>Meal Planner coming soon!</p>
+                    <!-- New Meal Plan Form -->
+                    <div class="bg-gray-100 p-4 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Create a New Meal Plan</h3>
+                        <div class="flex space-x-2">
+                            <input type="text" id="new-plan-name" placeholder="e.g., This Week's Dinners" class="p-2 border border-gray-300 rounded-md flex-grow">
+                            <button id="create-plan-btn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Create Plan</button>
+                        </div>
+                    </div>
+                    <!-- List of Existing Meal Plans -->
+                    <div>
+                        <h3 class="text-lg font-semibold mb-2">Your Meal Plans</h3>
+                        <div id="meal-plans-list" class="space-y-2">
+                            <!-- Meal plans will be dynamically inserted here -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -607,12 +620,66 @@
                 }
             }
 
-             // --- Meal Planner Modal ---
-             const mealPlannerModal = document.getElementById('meal-planner-modal');
-             const mealPlannerButton = document.getElementById('meal-planner-button');
-             mealPlannerButton.addEventListener('click', () => {
+            // --- Meal Planner Functionality ---
+            const mealPlannerModal = document.getElementById('meal-planner-modal');
+            const mealPlannerButton = document.getElementById('meal-planner-button');
+            const mealPlansList = document.getElementById('meal-plans-list');
+            const newPlanNameInput = document.getElementById('new-plan-name');
+            const createPlanBtn = document.getElementById('create-plan-btn');
+
+            mealPlannerButton.addEventListener('click', showMealPlanner);
+
+            async function showMealPlanner() {
+                if (!currentUserEmail) {
+                    showToast('Please log in to use the Meal Planner.', 'error');
+                    return;
+                }
                 toggleModal(mealPlannerModal, true);
-             });
+                const response = await fetch('/api/meal-plans');
+                const plans = await response.json();
+                renderMealPlansList(plans);
+            }
+
+            function renderMealPlansList(plans) {
+                mealPlansList.innerHTML = '';
+                if (plans.length === 0) {
+                    mealPlansList.innerHTML = '<p class="text-gray-500">You have no saved meal plans.</p>';
+                    return;
+                }
+                plans.forEach(plan => {
+                    const planElement = document.createElement('div');
+                    planElement.className = 'bg-white p-3 rounded-md shadow cursor-pointer hover:bg-gray-100';
+                    planElement.textContent = plan.name;
+                    planElement.addEventListener('click', () => {
+                        // In the next step, this will load the calendar view for this plan
+                        showToast(`Selected plan: ${plan.name}`, 'success');
+                    });
+                    mealPlansList.appendChild(planElement);
+                });
+            }
+
+            createPlanBtn.addEventListener('click', async () => {
+                const name = newPlanNameInput.value.trim();
+                if (!name) {
+                    showToast('Please enter a name for your new meal plan.', 'error');
+                    return;
+                }
+                const response = await fetch('/api/meal-plans', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name }),
+                });
+                if (response.ok) {
+                    newPlanNameInput.value = '';
+                    showToast('New meal plan created!', 'success');
+                    // Refresh the list
+                    const plansResponse = await fetch('/api/meal-plans');
+                    const plans = await plansResponse.json();
+                    renderMealPlansList(plans);
+                } else {
+                    showToast('Failed to create meal plan.', 'error');
+                }
+            });
             
             // --- Modals Logic ---
             const confirmModal = document.getElementById('confirm-modal');
