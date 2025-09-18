@@ -4,6 +4,6 @@ git status
 
 git add .
 
-git commit -m "create a sharing link with updated toml file - 1901 16/09/25"
+git commit -m "updating index.html to add interactive calendar: 2101 18/9/25"
 
-git push origin feature/shopping-list
+git push origin meal-planner
