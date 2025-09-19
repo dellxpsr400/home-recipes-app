@@ -719,30 +719,26 @@
             function renderCalendar(plannedRecipes) {
                 calendarBody.innerHTML = '';
                 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                const mealTimes = ['Breakfast', 'Lunch', 'Dinner'];
-
+                
                 days.forEach(day => {
-                    mealTimes.forEach(mealTime => {
-                        const mealSlot = document.createElement('div');
-                        mealSlot.className = 'border p-2 min-h-[120px] drop-zone';
-                        mealSlot.dataset.day = day;
-                        mealSlot.dataset.mealTime = mealTime;
-                        mealSlot.innerHTML = `<h4 class="font-semibold text-sm border-b mb-1">${mealTime}</h4>`;
-                        
-                        const recipeList = document.createElement('div');
-                        recipeList.className = 'recipe-list space-y-1';
-                        
-                        const recipesForSlot = plannedRecipes.filter(r => r.day_of_week === day && r.meal_time === mealTime);
-                        recipesForSlot.forEach(r => {
-                            const recipeItem = document.createElement('div');
-                            recipeItem.className = 'bg-blue-100 p-1 rounded text-xs';
-                            recipeItem.textContent = r.recipe_name;
-                            recipeList.appendChild(recipeItem);
-                        });
+                    const dayCell = document.createElement('div');
+                    dayCell.className = 'border p-2 min-h-[200px] drop-zone';
+                    dayCell.dataset.day = day;
+                    dayCell.dataset.mealTime = 'Dinner'; // Simplified to just Dinner
 
-                        mealSlot.appendChild(recipeList);
-                        calendarBody.appendChild(mealSlot);
+                    const recipeList = document.createElement('div');
+                    recipeList.className = 'recipe-list space-y-1';
+                    
+                    const recipesForSlot = plannedRecipes.filter(r => r.day_of_week === day); // Simplified filter
+                    recipesForSlot.forEach(r => {
+                        const recipeItem = document.createElement('div');
+                        recipeItem.className = 'bg-blue-100 p-1 rounded text-xs';
+                        recipeItem.textContent = r.recipe_name;
+                        recipeList.appendChild(recipeItem);
                     });
+
+                    dayCell.appendChild(recipeList);
+                    calendarBody.appendChild(dayCell);
                 });
                 addDropZoneListeners();
             }
@@ -799,10 +795,11 @@
 
             async function handleDrop(e) {
                 e.preventDefault();
-                e.currentTarget.classList.remove('drop-zone-active');
+                const target = e.currentTarget;
+                target.classList.remove('drop-zone-active');
                 
                 const recipeData = JSON.parse(e.dataTransfer.getData('text/plain'));
-                const { day, mealTime } = e.currentTarget.dataset;
+                const { day, mealTime } = target.dataset;
 
                 const response = await fetch('/api/meal-plan-recipes', {
                     method: 'POST',
@@ -816,13 +813,15 @@
                 });
 
                 if (response.ok) {
-                    showToast(`${recipeData.name} added to ${day} ${mealTime}.`, 'success');
+                    showToast(`${recipeData.name} added to ${day}.`, 'success');
                     // Add the recipe to the UI instantly
-                    const recipeList = e.currentTarget.querySelector('.recipe-list');
-                    const recipeItem = document.createElement('div');
-                    recipeItem.className = 'bg-blue-100 p-1 rounded text-xs';
-                    recipeItem.textContent = recipeData.name;
-                    recipeList.appendChild(recipeItem);
+                    const recipeList = target.querySelector('.recipe-list');
+                    if (recipeList) {
+                        const recipeItem = document.createElement('div');
+                        recipeItem.className = 'bg-blue-100 p-1 rounded text-xs';
+                        recipeItem.textContent = recipeData.name;
+                        recipeList.appendChild(recipeItem);
+                    }
                 } else {
                     showToast('Failed to add recipe to plan.', 'error');
                 }

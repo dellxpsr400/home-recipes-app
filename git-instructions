@@ -4,6 +4,6 @@ git status
 
 git add .
 
-git commit -m "updating index.html to implement 2-column option: 1149 19/9/25"
+git commit -m "implement 2-column solution, simplifying to dinner only and fix rendering bug: 1149 19/9/25"
 
 git push origin meal-planner
