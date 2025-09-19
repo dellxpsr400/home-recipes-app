@@ -4,7 +4,9 @@ interface Env {
   DB: D1Database;
 }
 
-// NOTE: The unreliable top-level buildTimestamp constant has been removed.
+// This captures the timestamp when the function is first initialized after a new deployment.
+const buildTimestamp = new Date().toISOString();
+
 
 // Helper function to render the read-only recipe share page
 function renderSharePage(recipe: any): Response {
@@ -74,8 +76,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // --- PUBLIC BUILD INFO ROUTE ---
     if (path === '/api/build-info') {
-        // Return the current server time on each request. This acts as a reliable
-        // "live status indicator" to confirm a new deployment is active.
         return new Response(JSON.stringify({ timestamp: new Date().toISOString() }), {
             headers: { 'Content-Type': 'application/json' }
         });
@@ -154,7 +154,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     
     // --- SECURE API ROUTES (Login required) ---
 
-    // Get user identity from the Access JWT. This is the security gate for all subsequent routes.
     const identity = await getIdentity(request);
     if (!identity) {
         if (path.startsWith('/api/')) {
@@ -194,13 +193,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     // --- MEAL PLANNER ROUTES ---
-    // GET /api/meal-plans - Get all meal plans for the user
     if (path === '/api/meal-plans' && request.method === 'GET') {
         const { results } = await env.DB.prepare("SELECT * FROM meal_plans WHERE user_id = ? ORDER BY created_at DESC").bind(userId).all();
         return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    // POST /api/meal-plans - Create a new meal plan
     if (path === '/api/meal-plans' && request.method === 'POST') {
         const { name } = await request.json<{ name: string }>();
         if (!name) return new Response('Meal plan name is required', { status: 400 });
@@ -208,7 +205,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return new Response(JSON.stringify({ success: true, id: meta.last_row_id }), { status: 201 });
     }
 
-    // GET /api/meal-plans/:id - Get a single meal plan with its recipes
     if (path.match(/^\/api\/meal-plans\/\d+$/) && request.method === 'GET') {
         const planId = path.split('/').pop();
         const plan = await env.DB.prepare("SELECT * FROM meal_plans WHERE id = ? AND user_id = ?").bind(planId, userId).first();
@@ -223,8 +219,44 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
         return new Response(JSON.stringify({ ...plan, recipes }), { headers: { 'Content-Type': 'application/json' } });
     }
+
+    // POST /api/meal-plans/:id/shopping-list - Generate a shopping list for a plan
+    if (path.match(/^\/api\/meal-plans\/\d+\/shopping-list$/) && request.method === 'POST') {
+        const planId = path.split('/')[3];
+        const plan = await env.DB.prepare("SELECT * FROM meal_plans WHERE id = ? AND user_id = ?").bind(planId, userId).first<{ id: number; name: string }>();
+        if (!plan) return new Response('Meal plan not found', { status: 404 });
+
+        const { results: plannedRecipes } = await env.DB.prepare(
+            `SELECT r.ingredients FROM meal_plan_recipes mpr JOIN recipes r ON mpr.recipe_id = r.id WHERE mpr.meal_plan_id = ?`
+        ).bind(planId).all<{ ingredients: string }>();
+
+        if (plannedRecipes.length === 0) {
+            return new Response(JSON.stringify({ success: true, message: 'No recipes in plan' }));
+        }
+
+        const shoppingListStmt = env.DB.prepare("INSERT INTO shopping_list (user_id, ingredient_name, quantity, unit, recipe_name) VALUES (?, ?, ?, ?, ?)");
+        const batch = [];
+
+        for (const recipe of plannedRecipes) {
+            try {
+                const ingredientsData = JSON.parse(recipe.ingredients);
+                for (const section of ingredientsData) {
+                    for (const item of section.items) {
+                        batch.push(shoppingListStmt.bind(userId, item.name, item.quantity || '', item.unit || '', plan.name));
+                    }
+                }
+            } catch (e) {
+                console.error(`Could not parse ingredients for a recipe in plan ${planId}:`, recipe.ingredients);
+            }
+        }
+        
+        if (batch.length > 0) {
+            await env.DB.batch(batch);
+        }
+
+        return new Response(JSON.stringify({ success: true, items_added: batch.length }));
+    }
     
-    // POST /api/meal-plan-recipes - Add a recipe to a meal plan
     if (path === '/api/meal-plan-recipes' && request.method === 'POST') {
         const { meal_plan_id, recipe_id, day_of_week, meal_time } = await request.json<{ meal_plan_id: number; recipe_id: number; day_of_week: string; meal_time: string; }>();
         if (!meal_plan_id || !recipe_id || !day_of_week || !meal_time) {
@@ -236,10 +268,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return new Response(JSON.stringify({ success: true }), { status: 201 });
     }
 
-    // DELETE /api/meal-plan-recipes/:id - Remove a recipe from a meal plan
     if (path.match(/^\/api\/meal-plan-recipes\/\d+$/) && request.method === 'DELETE') {
         const recipePlanId = path.split('/').pop();
-        // We need to verify the user owns the plan this recipe is being deleted from.
         await env.DB.prepare(
             `DELETE FROM meal_plan_recipes 
              WHERE id = ? 
