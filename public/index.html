@@ -206,7 +206,7 @@
     <!-- Meal Planner Modal -->
     <div id="meal-planner-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
         <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
-        <div class="modal-container bg-white w-11/12 md:max-w-6xl mx-auto rounded shadow-lg z-50 overflow-y-auto" style="max-height: 90vh;">
+        <div class="modal-container bg-white w-11/12 md:max-w-7xl mx-auto rounded shadow-lg z-50 overflow-y-auto" style="max-height: 90vh;">
             <div class="modal-content py-4 text-left px-6">
                 <div class="flex justify-between items-center pb-3">
                     <p id="meal-planner-title" class="text-2xl font-bold">Meal Planner</p>
@@ -231,19 +231,26 @@
                     </div>
 
                     <!-- View for the calendar -->
-                    <div id="plan-calendar-view" class="hidden">
-                        <button id="back-to-plans-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mb-4">← Back to Plans</button>
-                        <div class="grid grid-cols-7 gap-2 text-center">
-                            <!-- Calendar headers -->
-                            <div class="font-bold">Monday</div>
-                            <div class="font-bold">Tuesday</div>
-                            <div class="font-bold">Wednesday</div>
-                            <div class="font-bold">Thursday</div>
-                            <div class="font-bold">Friday</div>
-                            <div class="font-bold">Saturday</div>
-                            <div class="font-bold">Sunday</div>
+                    <div id="plan-calendar-view" class="hidden flex space-x-4">
+                        <!-- Left Column: Search -->
+                        <div class="w-1/3">
+                             <button id="back-to-plans-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mb-4 w-full">← Back to Plans</button>
+                             <input type="text" id="planner-search-input" placeholder="Search for recipes to add..." class="p-2 border border-gray-300 rounded-md w-full mb-2">
+                             <div id="planner-search-results" class="space-y-2 h-96 overflow-y-auto"></div>
                         </div>
-                         <div id="calendar-body" class="grid grid-cols-7 gap-2 mt-2"></div>
+                        <!-- Right Column: Calendar -->
+                        <div class="w-2/3">
+                            <div class="grid grid-cols-7 gap-2 text-center">
+                                <div class="font-bold">Monday</div>
+                                <div class="font-bold">Tuesday</div>
+                                <div class="font-bold">Wednesday</div>
+                                <div class="font-bold">Thursday</div>
+                                <div class="font-bold">Friday</div>
+                                <div class="font-bold">Saturday</div>
+                                <div class="font-bold">Sunday</div>
+                            </div>
+                             <div id="calendar-body" class="grid grid-cols-7 gap-2 mt-2"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -310,7 +317,7 @@
                         button.textContent = tag;
                         button.className = 'bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow';
                         button.addEventListener('click', () => {
-                            searchRecipes('tag', tag);
+                            searchRecipes('tag', tag, searchResultsContainer);
                             tagsWrapper.classList.add('hidden');
                             searchContainer.classList.remove('hidden');
                             headerActionsContainer.classList.remove('hidden');
@@ -331,8 +338,8 @@
             const searchResultsContainer = document.getElementById('search-results');
             const clearSearchBtn = document.getElementById('clear-search-btn');
 
-            searchByNameInput.addEventListener('input', debounce(() => searchRecipes('nameOrId', searchByNameInput.value), 300));
-            searchByIngredientsInput.addEventListener('input', debounce(() => searchRecipes('ingredients', searchByIngredientsInput.value), 300));
+            searchByNameInput.addEventListener('input', debounce(() => searchRecipes('nameOrId', searchByNameInput.value, searchResultsContainer), 300));
+            searchByIngredientsInput.addEventListener('input', debounce(() => searchRecipes('ingredients', searchByIngredientsInput.value, searchResultsContainer), 300));
             
             clearSearchBtn.addEventListener('click', () => {
                 searchByNameInput.value = '';
@@ -341,8 +348,8 @@
                 selectedTagDisplay.textContent = '';
             });
 
-            async function searchRecipes(type, query) {
-                if (!query || query.length < 1) { searchResultsContainer.innerHTML = ''; return; }
+            async function searchRecipes(type, query, container) {
+                if (!query || query.length < 1) { container.innerHTML = ''; return; }
                 let endpoint = '';
                 if (type === 'nameOrId') {
                     endpoint = `/api/recipes/search?q=${query}`;
@@ -354,17 +361,17 @@
                 
                 const response = await fetch(endpoint);
                 const recipes = await response.json();
-                searchResultsContainer.innerHTML = recipes.length === 0 ? '<p class="text-gray-500">No recipes found.</p>' : '';
+                container.innerHTML = recipes.length === 0 ? '<p class="text-gray-500">No recipes found.</p>' : '';
                 recipes.forEach(recipe => {
                     const card = document.createElement('div');
-                    card.className = 'bg-gray-200 p-4 rounded-lg shadow cursor-pointer hover:bg-gray-300';
-                    card.draggable = true; // Make recipe cards draggable
+                    card.className = 'bg-gray-200 p-2 rounded-lg shadow cursor-pointer hover:bg-gray-300';
+                    card.draggable = true;
                     card.dataset.recipeId = recipe.id;
                     card.dataset.recipeName = recipe.name;
-                    card.innerHTML = `<h3 class="font-bold text-lg">(${recipe.id}) ${recipe.name}</h3>`;
+                    card.innerHTML = `<h3 class="font-semibold text-sm">(${recipe.id}) ${recipe.name}</h3>`;
                     card.addEventListener('click', () => showRecipeDetails(recipe.id));
                     card.addEventListener('dragstart', handleDragStart);
-                    searchResultsContainer.appendChild(card);
+                    container.appendChild(card);
                 });
             }
 
@@ -656,6 +663,8 @@
             const createPlanBtn = document.getElementById('create-plan-btn');
             const backToPlansBtn = document.getElementById('back-to-plans-btn');
             const calendarBody = document.getElementById('calendar-body');
+            const plannerSearchInput = document.getElementById('planner-search-input');
+            const plannerSearchResults = document.getElementById('planner-search-results');
 
             mealPlannerButton.addEventListener('click', showMealPlanner);
 
@@ -663,6 +672,8 @@
                 planCalendarView.classList.add('hidden');
                 planManagementView.classList.remove('hidden');
                 mealPlannerTitle.textContent = 'Meal Planner';
+                plannerSearchInput.value = '';
+                plannerSearchResults.innerHTML = '';
             });
 
             async function showMealPlanner() {
@@ -711,12 +722,9 @@
                 const mealTimes = ['Breakfast', 'Lunch', 'Dinner'];
 
                 days.forEach(day => {
-                    const dayCell = document.createElement('div');
-                    dayCell.className = 'border p-2 min-h-[200px]';
-                    
                     mealTimes.forEach(mealTime => {
                         const mealSlot = document.createElement('div');
-                        mealSlot.className = 'mb-2 h-1/3 drop-zone';
+                        mealSlot.className = 'border p-2 min-h-[120px] drop-zone';
                         mealSlot.dataset.day = day;
                         mealSlot.dataset.mealTime = mealTime;
                         mealSlot.innerHTML = `<h4 class="font-semibold text-sm border-b mb-1">${mealTime}</h4>`;
@@ -733,12 +741,9 @@
                         });
 
                         mealSlot.appendChild(recipeList);
-                        dayCell.appendChild(mealSlot);
+                        calendarBody.appendChild(mealSlot);
                     });
-                    calendarBody.appendChild(dayCell);
                 });
-
-                // Add drop zone event listeners after rendering
                 addDropZoneListeners();
             }
 
@@ -763,6 +768,8 @@
                     showToast('Failed to create meal plan.', 'error');
                 }
             });
+
+            plannerSearchInput.addEventListener('input', debounce(() => searchRecipes('nameOrId', plannerSearchInput.value, plannerSearchResults), 300));
 
             // --- Drag and Drop Logic ---
             function handleDragStart(e) {
