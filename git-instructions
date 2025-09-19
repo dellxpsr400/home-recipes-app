@@ -4,6 +4,6 @@ git status
 
 git add .
 
-git commit -m "updating [[path]].ts to implement consolidated shopping list #1: 1218 19/9/25"
+git commit -m "updating index.html to implement consolidated shopping list #2: 1218 19/9/25"
 
 git push origin meal-planner
