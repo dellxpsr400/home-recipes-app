@@ -394,6 +394,8 @@
                 const recipe = await response.json();
                 recipeModalTitle.textContent = `(${recipe.id}) ${recipe.name}`;
 
+                const servesHtml = recipe.serves ? `<p class="text-gray-600 mb-4 font-semibold">Serves: ${recipe.serves}</p>` : '';
+
                 let ingredientsHtml = '<h4>Ingredients:</h4>';
                 try {
                     const ingredientsData = JSON.parse(recipe.ingredients);
@@ -443,6 +445,7 @@
                     </button>` : '';
 
                 recipeModalContent.innerHTML = `
+                    ${servesHtml}
                     ${ingredientsHtml}
                     <div class="flex justify-between items-center mt-4">
                         ${shareButtonHtml}
