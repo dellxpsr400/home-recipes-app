@@ -92,7 +92,7 @@
         </header>
         
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <!-- Search & Filters Sidebar/Top -->
+            <!-- Search & Filters Sidebar -->
             <div class="lg:col-span-4 space-y-6">
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                     <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Discovery</h2>
@@ -131,7 +131,6 @@
             <!-- Results Feed -->
             <div class="lg:col-span-8">
                 <div id="search-results" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Cards styled as clean items with accent borders -->
                     <div class="md:col-span-2 text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
                         <p class="text-slate-400 font-medium">Use the discovery tools to find your next meal.</p>
                     </div>
@@ -153,13 +152,13 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             </button>
 
-            <!-- STICKY Header -->
-            <div class="sticky top-0 bg-white/95 backdrop-blur-md z-10 px-8 py-5 border-b border-slate-100 flex justify-between items-center">
-                <div class="min-w-0">
+            <!-- STICKY Header - FIXED: items-start and flex-grow to prevent title truncation -->
+            <div class="sticky top-0 bg-white/95 backdrop-blur-md z-10 px-8 py-5 border-b border-slate-100 flex justify-between items-start">
+                <div class="flex-grow pr-6 min-w-0">
                     <p id="modal-counter" class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-1"></p>
-                    <h2 id="recipe-modal-title" class="text-xl md:text-3xl font-black text-slate-900 truncate"></h2>
+                    <h2 id="recipe-modal-title" class="text-xl md:text-3xl font-black text-slate-900 leading-tight"></h2>
                 </div>
-                <div class="flex items-center gap-2 md:gap-4 shrink-0">
+                <div class="flex items-center gap-2 md:gap-4 shrink-0 pt-1">
                     <!-- Header Quick Nav -->
                     <div id="header-nav-group" class="flex items-center bg-slate-100 rounded-xl p-1">
                         <button id="header-prev-btn" class="p-1.5 text-indigo-600 disabled:text-slate-300 hover:bg-white hover:shadow-sm rounded-lg transition" title="Previous">
@@ -197,7 +196,7 @@
         </div>
     </div>
     
-    <!-- Modals (Shopping, Log, Confirm, Share, Planner) -->
+    <!-- Modals Section -->
     <div id="shopping-list-modal" class="modal opacity-0 pointer-events-none fixed inset-0 flex items-center justify-center z-50 p-4">
         <div class="modal-overlay absolute inset-0 bg-slate-900/40 glass-overlay"></div>
         <div class="modal-container bg-white w-full max-w-lg mx-auto rounded-3xl shadow-2xl z-50 overflow-hidden">
@@ -323,7 +322,7 @@
                 } else { userGreeting.textContent = 'Welcome back!'; }
             } catch (e) { userGreeting.textContent = 'Family Cookbook'; }
 
-            // --- Discovery: Categories (Tags) ---
+            // --- Categories (Tags) ---
             const tagsContainer = document.getElementById('tags-container');
             const toggleTagsBtn = document.getElementById('toggle-tags-btn');
             const tagsWrapper = document.getElementById('tags-wrapper');
@@ -356,7 +355,7 @@
                 } catch (e) { console.error("Tags fetch failed", e); }
             }
             
-            // --- Discovery: Search Functionality ---
+            // --- Search Functionality ---
             const searchByNameInput = document.getElementById('search-by-name');
             const searchByIngredientsInput = document.getElementById('search-by-ingredients');
             const searchResultsContainer = document.getElementById('search-results');
@@ -424,7 +423,7 @@
                 }
             }
 
-            // --- Modal: Stepping Logic ---
+            // --- Modal: Navigation ---
             const navigateRecipe = (direction) => {
                 if (currentResultSet.length === 0) return;
                 const currentIndex = currentResultSet.indexOf(parseInt(currentRecipeId));
@@ -446,7 +445,7 @@
                 const recipe = await response.json();
                 recipeModalTitle.textContent = recipe.name;
 
-                // Position tracking sync
+                // Sync navigation labels
                 const idx = currentResultSet.indexOf(parseInt(recipeId));
                 const total = currentResultSet.length;
                 if (idx !== -1 && total > 1) {
@@ -542,7 +541,7 @@
                 }
             }
 
-            // --- Handlers ---
+            // --- API Event Handlers ---
             async function handleShareRecipe(e) {
                 const recipeId = e.target.closest('button').dataset.recipeId;
                 const response = await fetch(`/api/recipes/${recipeId}/share`, { method: 'POST' });
@@ -583,7 +582,7 @@
                 toggleModal(recipeModal, false);
             }
 
-            // --- Shopping List, History & Planner (Logic Preserved) ---
+            // --- Features Logic (Preserved) ---
             async function showShoppingList() {
                 const response = await fetch('/api/shopping-list');
                 const items = await response.json();
@@ -678,7 +677,6 @@
                 if (!name) return;
                 await fetch('/api/meal-plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
                 document.getElementById('new-plan-name').value = ''; showToast('New plan created!', 'success');
-                // Trigger refresh by clicking button again
                 document.getElementById('meal-planner-button').click();
             });
 
@@ -697,6 +695,7 @@
 
             document.getElementById('planner-search-input').addEventListener('input', debounce(() => searchRecipes('nameOrId', document.getElementById('planner-search-input').value, document.getElementById('planner-search-results')), 300));
 
+            // --- UI Helpers ---
             function handleDragStart(e) { 
                 const data = { id: e.target.dataset.recipeId, name: e.target.dataset.recipeName };
                 e.dataTransfer.setData('text/plain', JSON.stringify(data)); 
@@ -765,7 +764,6 @@
                 if (e.key === 'Escape') toggleModal(recipeModal, false);
             });
 
-            // Startup Sequence
             loadAndDisplayTags();
             fetch('/api/build-info').then(r => r.json()).then(d => {
                 document.getElementById('build-timestamp').textContent = `System Live: ${new Date(d.timestamp).toLocaleString('en-GB')}`;
