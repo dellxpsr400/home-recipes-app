@@ -1,0 +1,81 @@
+Standard Operating Procedure: Recipe Data Extraction
+
+1.0 Objective
+
+Your primary objective is to extract recipe data from a source (e.g., a PDF) and format it into a single .sql file containing valid INSERT statements for the recipes table.
+
+The highest priority is to ensure 100% data consistency with the existing database schema and formatting, as detailed below. Any deviation will break the application.
+
+2.0 Output Format
+
+You will generate a single .sql file that includes:
+
+A comment block at the top containing the wrangler command to execute the file.
+
+A series of INSERT INTO recipes (id, name, ingredients, instructions, tags, serves) VALUES (...); statements, one for each new recipe.
+
+3.0 Field-by-Field Formatting Rules (Mandatory)
+
+You must adhere to the following data formats for each column:
+
+3.1 id (INTEGER, Primary Key)
+
+Format: A unique integer.
+
+Rule: The user will provide the starting id (e.g., 121). All new recipes must have a unique, sequential integer ID.
+
+Edge Case: If the source material has duplicate or non-integer IDs (e.g., '126' and '126.1'), you must ask the user for explicit instruction on how to map these to unique integers (e.g., "Should '126.1' be 127, or 141?"). Do not proceed with the insertion script until this ambiguity is resolved.
+
+3.2 name (TEXT)
+
+Format: A plain-text string.
+
+Rule: Extract the recipe title exactly as written.
+
+Example: 'Butter Bean Stew'
+
+3.3 serves (TEXT)
+
+Format: A plain-text string.
+
+Rule: Extract the "serves" information (e.g., "Serves 4", "4-6").
+
+Example: '4-6'
+
+3.4 ingredients (TEXT)
+
+Format: A valid JSON array of objects, stored as a string.
+
+Rule: You must parse the ingredient list into this structure: [{"section_title": "...", "items": [{"name": "...", "quantity": "...", "unit": "...", "notes": "..."}]}]
+
+If the recipe has ingredient headings (e.g., "For the Stew"), use these for section_title.
+
+If there are no headings, use a default title: "Main".
+
+All values (name, quantity, unit, notes) must be strings. If a value is missing (e.g., no unit), use an empty string "".
+
+Example: '[{"section_title":"Main","items":[{"name":"olive oil","quantity":"2","unit":"tbsp","notes":"chopped"}]}]'
+
+3.5 instructions (TEXT)
+
+Format: A valid JSON array of strings, stored as a string.
+
+Rule: Each numbered step or distinct paragraph in the method must be a separate string element in the array.
+
+Example: '["Step 1...", "Step 2...", "Step 3..."]'
+
+3.6 tags (TEXT) - CRITICAL
+
+Format: A plain-text, comma-separated string.
+
+CRITICAL RULE 1: You must not generate a JSON array (e.g., ["stew", "bean"]).
+
+CRITICAL RULE 2: You must capitalize the first letter of each individual tag.
+
+CRITICAL RULE 3: You must separate each tag with a comma and a space.
+
+Correct Example: 'Stew, Bean, Vegetarian, Batch-cook, Vegan'
+
+Incorrect (JSON): '["stew","bean","vegetarian"]'
+
+Incorrect (Lowercase): 'stew, bean, vegetarian'

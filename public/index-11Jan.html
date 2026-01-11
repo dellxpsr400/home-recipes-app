@@ -1,0 +1,949 @@
+<!-- public/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Recipes App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .modal { transition: opacity 0.25s ease; }
+        body.modal-active { overflow: hidden; }
+        .checked-item { text-decoration: line-through; color: #9ca3af; }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+            z-index: 1000;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(-20px);
+        }
+        .toast.success { background-color: #28a745; }
+        .toast.error { background-color: #dc3545; }
+        /* Star rating styles */
+        .star-rating {
+            display: flex;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+            font-size: 2.5em;
+            cursor: pointer;
+        }
+        .star-rating input { display: none; }
+        .star-rating label {
+            color: #ddd;
+            transition: color 0.2s;
+        }
+        .star-rating input:checked ~ label,
+        .star-rating label:hover,
+        .star-rating label:hover ~ label {
+            color: #fcd34d; /* Tailwind yellow-300 */
+        }
+        /* Drag and Drop styles */
+        .drop-zone-active {
+            background-color: #e0f2fe; /* Tailwind sky-100 */
+            border: 2px dashed #38bdf8; /* Tailwind sky-400 */
+        }
+        /* Ensure confirm modal appears above all others */
+        #confirm-modal {
+            z-index: 60;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div id="toast-notification" class="toast"></div>
+
+    <div class="container mx-auto p-4">
+        <div class="bg-white p-6 rounded-lg shadow-lg">
+            <!-- Header section - now responsive -->
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4">
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-0">Recipe Finder</h1>
+                <div id="header-actions-container" class="flex flex-col sm:flex-row w-full sm:w-auto">
+                    <span id="user-greeting" class="text-gray-600 mb-2 sm:mb-0 sm:mr-4 text-center sm:text-left"></span>
+                     <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                        <button id="meal-planner-button" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded">
+                            Meal Planner
+                        </button>
+                        <button id="meal-log-button" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                            Meal Log
+                        </button>
+                        <button id="shopping-list-button" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                            Shopping List
+                        </button>
+                     </div>
+                </div>
+            </div>
+            
+            <!-- Container for search inputs and clear button -->
+            <div id="search-container">
+                <!-- Search inputs - now responsive -->
+                <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
+                    <input type="text" id="search-by-name" placeholder="Search by name or number..." class="p-2 border border-gray-300 rounded-md w-full sm:w-1/2">
+                    <input type="text" id="search-by-ingredients" placeholder="Search by ingredients (e.g., chicken, tomato)..." class="p-2 border border-gray-300 rounded-md w-full sm:w-1/2">
+                </div>
+                <div class="flex justify-end mb-4">
+                    <button id="clear-search-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded w-full sm:w-auto">
+                       Clear Search
+                   </button>
+               </div>
+            </div>
+
+            <!-- Tags Section - Now Collapsible -->
+            <div class="mb-4">
+                <button id="toggle-tags-btn" class="font-bold text-lg mb-2 w-full text-left flex justify-between items-center">
+                    <span>Filter by Tag<span id="selected-tag-display" class="font-normal text-gray-500 ml-2"></span></span>
+                    <span id="tags-arrow">▼</span>
+                </button>
+                <div id="tags-wrapper" class="hidden">
+                    <div id="tags-container" class="flex flex-wrap gap-2 pt-2">
+                        <!-- Tag buttons will be dynamically inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <div id="search-results" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+            
+            <!-- Build Timestamp Display -->
+            <div class="mt-8 text-center">
+                <p id="build-timestamp" class="text-xs text-gray-400"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recipe Details Modal -->
+    <div id="recipe-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        <div class="modal-container bg-white w-11/12 md:max-w-2xl mx-auto rounded shadow-lg z-50 overflow-y-auto" style="max-height: 90vh;">
+            <div class="modal-content py-4 text-left px-6">
+                <div class="flex justify-between items-center pb-3">
+                    <p id="recipe-modal-title" class="text-2xl font-bold"></p>
+                    <div class="modal-close cursor-pointer z-50">
+                        <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
+                    </div>
+                </div>
+                <div id="recipe-modal-content" class="text-gray-700"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Shopping List Modal -->
+    <div id="shopping-list-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        <div class="modal-container bg-white w-11/12 md:max-w-lg mx-auto rounded shadow-lg z-50 overflow-y-auto" style="max-height: 90vh;">
+            <div class="modal-content py-4 text-left px-6">
+                <div class="flex justify-between items-center pb-3">
+                    <p class="text-2xl font-bold">Shopping List</p>
+                    <div class="modal-close cursor-pointer z-50">
+                         <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
+                    </div>
+                </div>
+                <div id="shopping-list-content" class="space-y-4"></div>
+                <div class="flex justify-end mt-4 space-x-2">
+                    <button id="update-checked-btn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Update List</button>
+                    <button id="clear-checked-items-btn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Clear Checked Items</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meal Log Modal -->
+    <div id="meal-log-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        <div class="modal-container bg-white w-11/12 md:max-w-2xl mx-auto rounded shadow-lg z-50 overflow-y-auto" style="max-height: 90vh;">
+            <div class="modal-content py-4 text-left px-6">
+                <div class="flex justify-between items-center pb-3">
+                    <p class="text-2xl font-bold">Meal Log</p>
+                    <div class="modal-close cursor-pointer z-50">
+                         <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
+                    </div>
+                </div>
+                <div id="meal-log-content" class="space-y-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        <div class="modal-container bg-white w-11/12 md:max-w-md mx-auto rounded shadow-lg z-50 overflow-y-auto">
+            <div class="modal-content py-4 text-left px-6">
+                <div class="flex justify-between items-center pb-3">
+                    <p class="text-2xl font-bold">Confirm Action</p>
+                </div>
+                <p id="confirm-modal-text" class="text-gray-700 mb-4">Are you sure?</p>
+                <div class="flex justify-end space-x-2">
+                    <button id="confirm-cancel-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded">Cancel</button>
+                    <button id="confirm-ok-btn" class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div id="share-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        <div class="modal-container bg-white w-11/12 md:max-w-lg mx-auto rounded shadow-lg z-50">
+            <div class="modal-content py-4 text-left px-6">
+                <div class="flex justify-between items-center pb-3">
+                    <p class="text-2xl font-bold">Share Recipe</p>
+                    <div class="modal-close cursor-pointer z-50">
+                         <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
+                    </div>
+                </div>
+                <p class="text-gray-700 mb-2">Here is your shareable link:</p>
+                <input type="text" id="share-link-input" readonly class="w-full p-2 border border-gray-300 rounded bg-gray-100">
+                <div class="flex justify-end mt-4">
+                    <button id="copy-share-link-btn" class="bg-indigo-500 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">Copy Link</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meal Planner Modal -->
+    <div id="meal-planner-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50"></div>
+        <div class="modal-container bg-white w-11/12 md:max-w-7xl mx-auto rounded shadow-lg z-50 overflow-y-auto" style="max-height: 90vh;">
+            <div class="modal-content py-4 text-left px-6">
+                <div class="flex justify-between items-center pb-3">
+                    <p id="meal-planner-title" class="text-2xl font-bold">Meal Planner</p>
+                    <div class="modal-close cursor-pointer z-50">
+                         <svg class="fill-current text-black" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18"><path d="M14.53 4.53l-1.06-1.06L9 7.94 4.53 3.47 3.47 4.53 7.94 9l-4.47 4.47 1.06 1.06L9 10.06l4.47 4.47 1.06-1.06L10.06 9z"></path></svg>
+                    </div>
+                </div>
+                <div id="meal-planner-content">
+                    <!-- View for managing plans -->
+                    <div id="plan-management-view">
+                        <div class="bg-gray-100 p-4 rounded-lg mb-4">
+                            <h3 class="text-lg font-semibold mb-2">Create a New Meal Plan</h3>
+                            <div class="flex space-x-2">
+                                <input type="text" id="new-plan-name" placeholder="e.g., This Week's Dinners" class="p-2 border border-gray-300 rounded-md flex-grow">
+                                <button id="create-plan-btn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Create Plan</button>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold mb-2">Your Meal Plans</h3>
+                            <div id="meal-plans-list" class="space-y-2"></div>
+                        </div>
+                    </div>
+
+                    <!-- View for the calendar -->
+                    <div id="plan-calendar-view" class="hidden flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                        <!-- Left Column: Search & Actions -->
+                        <div class="w-full sm:w-1/3">
+                             <button id="back-to-plans-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded mb-4 w-full">← Back to Plans</button>
+                             <button id="generate-shopping-list-btn" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded mb-4 w-full">Generate Shopping List for this Plan</button>
+                             <input type="text" id="planner-search-input" placeholder="Search for recipes to add..." class="p-2 border border-gray-300 rounded-md w-full mb-2">
+                             <div id="planner-search-results" class="space-y-2 h-96 overflow-y-auto"></div>
+                        </div>
+                        <!-- Right Column: Calendar -->
+                        <div class="w-full sm:w-2/3">
+                            <div class="grid grid-cols-7 gap-2 text-center">
+                                <div class="font-bold p-2">Monday</div>
+                                <div class="font-bold p-2">Tuesday</div>
+                                <div class="font-bold p-2">Wednesday</div>
+                                <div class="font-bold p-2">Thursday</div>
+                                <div class="font-bold p-2">Friday</div>
+                                <div class="font-bold p-2">Saturday</div>
+                                <div class="font-bold p-2">Sunday</div>
+                            </div>
+                             <div id="calendar-body" class="grid grid-cols-7 gap-2 mt-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function () {
+            let currentUserEmail = null;
+            let currentMealPlan = null;
+
+            // --- User Info ---
+            const userGreeting = document.getElementById('user-greeting');
+            try {
+                const identityRes = await fetch('/cdn-cgi/access/get-identity');
+                if (identityRes.ok) {
+                    const identity = await identityRes.json();
+                    currentUserEmail = identity.email;
+
+                    const nameMap = {
+                        'nicolasj.oliver@gmail.com': 'Nick',
+                        'rachelcasey246@gmail.com': 'Rach',
+                        'rosieoliver168@gmail.com': 'Rosie'
+                    };
+
+                    const friendlyName = nameMap[currentUserEmail] || currentUserEmail.split('@')[0];
+                    userGreeting.textContent = `Hello, ${friendlyName}!`;
+                } else { 
+                    userGreeting.textContent = 'Welcome!'; 
+                }
+            } catch (e) { 
+                userGreeting.textContent = 'Welcome!'; 
+            }
+
+            // --- Tags Functionality ---
+            const tagsContainer = document.getElementById('tags-container');
+            const toggleTagsBtn = document.getElementById('toggle-tags-btn');
+            const tagsWrapper = document.getElementById('tags-wrapper');
+            const tagsArrow = document.getElementById('tags-arrow');
+            const selectedTagDisplay = document.getElementById('selected-tag-display');
+            const searchContainer = document.getElementById('search-container');
+            const headerActionsContainer = document.getElementById('header-actions-container');
+
+
+            toggleTagsBtn.addEventListener('click', () => {
+                const isTagsBecomingHidden = tagsWrapper.classList.toggle('hidden');
+                searchContainer.classList.toggle('hidden', !isTagsBecomingHidden);
+                headerActionsContainer.classList.toggle('hidden', !isTagsBecomingHidden);
+
+                tagsArrow.textContent = tagsWrapper.classList.contains('hidden') ? '▼' : '▲';
+                 if (!tagsWrapper.classList.contains('hidden')) {
+                    selectedTagDisplay.textContent = '';
+                }
+            });
+
+            async function loadAndDisplayTags() {
+                try {
+                    const response = await fetch('/api/tags');
+                    const tags = await response.json();
+                    tagsContainer.innerHTML = '';
+                    tags.sort().forEach(tag => {
+                        const button = document.createElement('button');
+                        button.textContent = tag;
+                        button.className = 'bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow';
+                        button.addEventListener('click', () => {
+                            searchRecipes('tag', tag, searchResultsContainer);
+                            tagsWrapper.classList.add('hidden');
+                            searchContainer.classList.remove('hidden');
+                            headerActionsContainer.classList.remove('hidden');
+                            tagsArrow.textContent = '▼';
+                            selectedTagDisplay.textContent = `: ${tag}`;
+                        });
+                        tagsContainer.appendChild(button);
+                    });
+                } catch (e) {
+                    console.error("Failed to load tags:", e);
+                    tagsContainer.innerHTML = '<p class="text-red-500">Could not load tags.</p>';
+                }
+            }
+            
+            // --- Search Functionality ---
+            const searchByNameInput = document.getElementById('search-by-name');
+            const searchByIngredientsInput = document.getElementById('search-by-ingredients');
+            const searchResultsContainer = document.getElementById('search-results');
+            const clearSearchBtn = document.getElementById('clear-search-btn');
+
+            searchByNameInput.addEventListener('input', debounce(() => searchRecipes('nameOrId', searchByNameInput.value, searchResultsContainer), 300));
+            searchByIngredientsInput.addEventListener('input', debounce(() => searchRecipes('ingredients', searchByIngredientsInput.value, searchResultsContainer), 300));
+            
+            clearSearchBtn.addEventListener('click', () => {
+                searchByNameInput.value = '';
+                searchByIngredientsInput.value = '';
+                searchResultsContainer.innerHTML = '';
+                selectedTagDisplay.textContent = '';
+            });
+
+            async function searchRecipes(type, query, container) {
+                if (!query || query.length < 1) { container.innerHTML = ''; return; }
+                let endpoint = '';
+                if (type === 'nameOrId') {
+                    endpoint = `/api/recipes/search?q=${query}`;
+                } else if (type === 'ingredients') {
+                    endpoint = `/api/recipes/ingredients?q=${query}`;
+                } else if (type === 'tag') {
+                    endpoint = `/api/recipes/tags?q=${query}`;
+                }
+                
+                const response = await fetch(endpoint);
+                const recipes = await response.json();
+                container.innerHTML = recipes.length === 0 ? '<p class="text-gray-500">No recipes found.</p>' : '';
+                recipes.forEach(recipe => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-gray-200 p-2 rounded-lg shadow cursor-pointer hover:bg-gray-300';
+                    card.draggable = true;
+                    card.dataset.recipeId = recipe.id;
+                    card.dataset.recipeName = recipe.name;
+                    card.innerHTML = `<h3 class="font-semibold text-sm">(${recipe.id}) ${recipe.name}</h3>`;
+                    card.addEventListener('click', () => showRecipeDetails(recipe.id));
+                    card.addEventListener('dragstart', handleDragStart);
+                    container.appendChild(card);
+                });
+            }
+
+            // --- Recipe Modal ---
+            const recipeModal = document.getElementById('recipe-modal');
+            const recipeModalTitle = document.getElementById('recipe-modal-title');
+            const recipeModalContent = document.getElementById('recipe-modal-content');
+            
+            async function showRecipeDetails(recipeId) {
+                const response = await fetch(`/api/recipes/${recipeId}`);
+                if (!response.ok) {
+                    showToast('Could not load recipe details.', 'error');
+                    return;
+                }
+                const recipe = await response.json();
+                recipeModalTitle.textContent = `(${recipe.id}) ${recipe.name}`;
+
+                const servesHtml = recipe.serves ? `<p class="text-gray-600 mb-4 font-semibold">Serves: ${recipe.serves}</p>` : '';
+
+                let ingredientsHtml = '<h4>Ingredients:</h4>';
+                try {
+                    const ingredientsData = JSON.parse(recipe.ingredients);
+                    ingredientsData.forEach(section => {
+                        ingredientsHtml += `<h5 class="font-semibold mt-2">${section.section_title}</h5>`;
+                        const itemsHtml = section.items.map(ing => {
+                            const fullText = `${ing.quantity || ''} ${ing.unit || ''} ${ing.name} ${ing.notes || ''}`.trim();
+                             return `<li class="flex items-center">
+                                <input type="checkbox" class="mr-3 h-5 w-5 ingredient-checkbox" data-name="${ing.name}" data-quantity="${ing.quantity || ''}" data-unit="${ing.unit || ''}">
+                                <span>${fullText}</span>
+                            </li>`;
+                        }).join('');
+                        ingredientsHtml += `<ul class="list-disc list-inside">${itemsHtml}</ul>`;
+                    });
+                } catch (e) {
+                    ingredientsHtml = `<p>${recipe.ingredients}</p>`;
+                }
+
+                let instructionsHtml = '<h4>Instructions:</h4>';
+                try {
+                    const instructionsData = JSON.parse(recipe.instructions);
+                    const itemsHtml = instructionsData.map(step => `<li>${step}</li>`).join('');
+                    instructionsHtml = `<ol class="list-decimal list-inside">${itemsHtml}</ol>`;
+                } catch (e) {
+                    instructionsHtml = `<p class="whitespace-pre-wrap">${recipe.instructions}</p>`;
+                }
+
+                const ratingsSectionHtml = `
+                    <div class="border-t mt-4 pt-4">
+                        <h4 class="font-bold">Your Rating & Notes</h4>
+                        <div class="star-rating my-2">
+                            <input type="radio" id="5-stars" name="rating" value="5" /><label for="5-stars">★</label>
+                            <input type="radio" id="4-stars" name="rating" value="4" /><label for="4-stars">★</label>
+                            <input type="radio" id="3-stars" name="rating" value="3" /><label for="3-stars">★</label>
+                            <input type="radio" id="2-stars" name="rating" value="2" /><label for="2-stars">★</label>
+                            <input type="radio" id="1-star" name="rating" value="1" /><label for="1-star">★</label>
+                        </div>
+                        <textarea id="recipe-notes" class="w-full p-2 border border-gray-300 rounded-md" rows="4" placeholder="Add your personal notes here..."></textarea>
+                        <div class="text-right mt-2">
+                            <button id="save-rating-btn" data-recipe-id="${recipe.id}" class="bg-purple-500 hover:bg-purple-700 text-white p-2 rounded">Save Rating & Notes</button>
+                        </div>
+                    </div>`;
+
+                const shareButtonHtml = currentUserEmail ? `
+                    <button id="share-recipe-btn" data-recipe-id="${recipe.id}" class="bg-indigo-500 hover:bg-indigo-700 text-white p-2 rounded">
+                        Share Recipe
+                    </button>` : '';
+
+                recipeModalContent.innerHTML = `
+                    ${servesHtml}
+                    ${ingredientsHtml}
+                    <div class="flex justify-between items-center mt-4">
+                        ${shareButtonHtml}
+                        <button id="add-to-list-btn" data-recipe-name="${recipe.name}" class="bg-green-500 text-white p-2 rounded">Add Selected to Shopping List</button>
+                    </div>
+                    ${instructionsHtml}
+                    <div class="border-t mt-4 pt-4">
+                        <h4 class="font-bold">Meal Log:</h4>
+                        <p>You have logged this meal ${recipe.log_count} time(s).</p>
+                        <div class="mt-2">
+                            <label for="eaten-date">Log this meal:</label>
+                            <input type="date" id="eaten-date" class="border p-1 rounded">
+                            <button id="log-meal-btn" data-recipe-id="${recipe.id}" class="bg-blue-500 text-white p-2 rounded ml-2">Log Meal</button>
+                        </div>
+                    </div>
+                    ${currentUserEmail ? ratingsSectionHtml : '<p class="mt-4 pt-4 border-t">Log in to add your own ratings and notes.</p>'}`;
+
+                if (currentUserEmail && recipe.user_rating) {
+                    const starInput = document.querySelector(`.star-rating input[value="${recipe.user_rating}"]`);
+                    if (starInput) starInput.checked = true;
+                }
+                if (currentUserEmail && recipe.user_notes) {
+                    document.getElementById('recipe-notes').value = recipe.user_notes;
+                }
+
+                toggleModal(recipeModal, true);
+                
+                document.getElementById('add-to-list-btn').addEventListener('click', handleAddToList);
+                document.getElementById('log-meal-btn').addEventListener('click', handleLogMeal);
+                if (currentUserEmail) {
+                    document.getElementById('save-rating-btn').addEventListener('click', handleSaveRating);
+                    if(document.getElementById('share-recipe-btn')) {
+                      document.getElementById('share-recipe-btn').addEventListener('click', handleShareRecipe);
+                    }
+                }
+            }
+
+            async function handleShareRecipe(e) {
+                const recipeId = e.target.dataset.recipeId;
+                const response = await fetch(`/api/recipes/${recipeId}/share`, { method: 'POST' });
+                if (!response.ok) {
+                    showToast('Could not create share link. Please try again.', 'error');
+                    return;
+                }
+                const { token } = await response.json();
+                const shareUrl = `${window.location.origin}/share/${token}`;
+                
+                const shareLinkInput = document.getElementById('share-link-input');
+                shareLinkInput.value = shareUrl;
+                toggleModal(shareModal, true);
+            }
+            
+            async function handleSaveRating(e) {
+                const recipeId = e.target.dataset.recipeId;
+                const ratingInput = document.querySelector('.star-rating input:checked');
+                const rating = ratingInput ? ratingInput.value : null;
+                const notes = document.getElementById('recipe-notes').value;
+
+                if (!rating) {
+                    showToast('Please select a star rating.', 'error');
+                    return;
+                }
+
+                await fetch('/api/ratings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipe_id: recipeId, rating: parseInt(rating), notes: notes }),
+                });
+
+                showToast('Rating and notes saved!', 'success');
+                toggleModal(recipeModal, false);
+            }
+
+            async function handleAddToList(e) {
+                const recipeName = e.target.dataset.recipeName;
+                const selectedCheckboxes = document.querySelectorAll('.ingredient-checkbox:checked');
+                if (selectedCheckboxes.length === 0) {
+                    showToast('Please select at least one ingredient to add.', 'error');
+                    return;
+                }
+                const items = Array.from(selectedCheckboxes).map(cb => ({
+                    name: cb.dataset.name, quantity: cb.dataset.quantity, unit: cb.dataset.unit,
+                }));
+                
+                await fetch('/api/shopping-list', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items, recipe_name: recipeName }),
+                });
+                showToast(`${items.length} item(s) added to your shopping list!`, 'success');
+                toggleModal(recipeModal, false);
+            }
+
+            async function handleLogMeal(e) {
+                const recipeId = e.target.dataset.recipeId;
+                const eatenDate = document.getElementById('eaten-date').value;
+                if (!eatenDate) { showToast('Please select a date.', 'error'); return; }
+                await fetch('/api/meal-log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ recipe_id: recipeId, eaten_date: eatenDate, notes: '' }),
+                });
+                showToast('Meal logged successfully!', 'success');
+                toggleModal(recipeModal, false);
+            }
+
+            // --- Shopping List Modal & Functionality ---
+            const shoppingListModal = document.getElementById('shopping-list-modal');
+            const shoppingListButton = document.getElementById('shopping-list-button');
+            const shoppingListContent = document.getElementById('shopping-list-content');
+            
+            shoppingListButton.addEventListener('click', showShoppingList);
+
+            async function showShoppingList() {
+                const response = await fetch('/api/shopping-list');
+                const items = await response.json();
+                renderShoppingList(items);
+                toggleModal(shoppingListModal, true);
+            }
+
+            function renderShoppingList(items) {
+                shoppingListContent.innerHTML = '';
+                if (items.length === 0) {
+                    shoppingListContent.innerHTML = '<p class="text-gray-500">Your shopping list is empty.</p>';
+                    return;
+                }
+                const groupedByRecipe = items.reduce((acc, item) => {
+                    (acc[item.recipe_name] = acc[item.recipe_name] || []).push(item);
+                    return acc;
+                }, {});
+
+                for (const recipeName in groupedByRecipe) {
+                    const recipeGroup = document.createElement('div');
+                    const itemsHtml = groupedByRecipe[recipeName].map(item => `
+                        <li class="flex items-center ml-4">
+                            <input type="checkbox" data-id="${item.id}" class="mr-3 h-5 w-5 shopping-item-checkbox" ${item.is_checked ? 'checked' : ''}>
+                            <span class="${item.is_checked ? 'checked-item' : ''}">${item.quantity || ''} ${item.unit || ''} ${item.ingredient_name}</span>
+                        </li>
+                    `).join('');
+                    recipeGroup.innerHTML = `<h4 class="font-bold text-lg">${recipeName}</h4><ul class="list-none">${itemsHtml}</ul>`;
+                    shoppingListContent.appendChild(recipeGroup);
+                }
+            }
+            
+            document.getElementById('update-checked-btn').addEventListener('click', async () => {
+                const checkboxes = document.querySelectorAll('.shopping-item-checkbox');
+                const updates = Array.from(checkboxes).map(cb => ({
+                    id: cb.dataset.id, is_checked: cb.checked,
+                }));
+                await fetch('/api/shopping-list/update', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ updates }),
+                });
+                showToast('List updated!', 'success');
+                await showShoppingList();
+            });
+
+            document.getElementById('clear-checked-items-btn').addEventListener('click', () => {
+                showConfirm(
+                    'Are you sure you want to clear all checked items?',
+                    async () => {
+                        await fetch('/api/shopping-list/clear', { method: 'DELETE' });
+                        await showShoppingList();
+                        showToast('Checked items cleared!', 'success');
+                    }
+                );
+            });
+
+            // --- Meal Log Modal ---
+            const mealLogModal = document.getElementById('meal-log-modal');
+            const mealLogButton = document.getElementById('meal-log-button');
+            const mealLogContent = document.getElementById('meal-log-content');
+
+            mealLogButton.addEventListener('click', showMealLog);
+
+            async function showMealLog() {
+                const response = await fetch('/api/meal-log');
+                if (!response.ok) {
+                    showToast('Please log in to view your meal log.', 'error');
+                    return;
+                }
+                const logs = await response.json();
+                renderMealLog(logs);
+                toggleModal(mealLogModal, true);
+            }
+
+            function renderMealLog(logs) {
+                mealLogContent.innerHTML = '';
+                if (logs.length === 0) {
+                    mealLogContent.innerHTML = '<p class="text-gray-500">You have not logged any meals yet.</p>';
+                    return;
+                }
+
+                const groupedByDate = logs.reduce((acc, log) => {
+                    (acc[log.eaten_date] = acc[log.eaten_date] || []).push(log);
+                    return acc;
+                }, {});
+
+                for (const date in groupedByDate) {
+                    const dateGroup = document.createElement('div');
+                    const itemsHtml = groupedByDate[date].map(log => `
+                        <li class="ml-4">${log.recipe_name}</li>
+                    `).join('');
+                    
+                    const displayDate = new Date(date + 'T00:00:00').toLocaleDateString('en-GB', {
+                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                    });
+
+                    dateGroup.innerHTML = `<h4 class="font-bold text-lg">${displayDate}</h4><ul class="list-disc list-inside">${itemsHtml}</ul>`;
+                    mealLogContent.appendChild(dateGroup);
+                }
+            }
+
+            // --- Meal Planner Functionality ---
+            const mealPlannerModal = document.getElementById('meal-planner-modal');
+            const mealPlannerButton = document.getElementById('meal-planner-button');
+            const mealPlannerTitle = document.getElementById('meal-planner-title');
+            const planManagementView = document.getElementById('plan-management-view');
+            const planCalendarView = document.getElementById('plan-calendar-view');
+            const mealPlansList = document.getElementById('meal-plans-list');
+            const newPlanNameInput = document.getElementById('new-plan-name');
+            const createPlanBtn = document.getElementById('create-plan-btn');
+            const backToPlansBtn = document.getElementById('back-to-plans-btn');
+            const calendarBody = document.getElementById('calendar-body');
+            const plannerSearchInput = document.getElementById('planner-search-input');
+            const plannerSearchResults = document.getElementById('planner-search-results');
+            const generateShoppingListBtn = document.getElementById('generate-shopping-list-btn');
+
+            mealPlannerButton.addEventListener('click', showMealPlanner);
+
+            backToPlansBtn.addEventListener('click', () => {
+                planCalendarView.classList.add('hidden');
+                planManagementView.classList.remove('hidden');
+                mealPlannerTitle.textContent = 'Meal Planner';
+                plannerSearchInput.value = '';
+                plannerSearchResults.innerHTML = '';
+            });
+
+            generateShoppingListBtn.addEventListener('click', async () => {
+                if (!currentMealPlan) return;
+                showConfirm(
+                    `Are you sure you want to add all ingredients from "${currentMealPlan.name}" to your shopping list?`,
+                    async () => {
+                        const response = await fetch(`/api/meal-plans/${currentMealPlan.id}/shopping-list`, {
+                            method: 'POST'
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            showToast(`${data.items_added} ingredients added to your shopping list!`, 'success');
+                            toggleModal(mealPlannerModal, false);
+                        } else {
+                            showToast('Failed to generate shopping list.', 'error');
+                        }
+                    }
+                );
+            });
+
+            async function showMealPlanner() {
+                if (!currentUserEmail) {
+                    showToast('Please log in to use the Meal Planner.', 'error');
+                    return;
+                }
+                planCalendarView.classList.add('hidden');
+                planManagementView.classList.remove('hidden');
+                mealPlannerTitle.textContent = 'Meal Planner';
+                toggleModal(mealPlannerModal, true);
+                const response = await fetch('/api/meal-plans');
+                const plans = await response.json();
+                renderMealPlansList(plans);
+            }
+
+            function renderMealPlansList(plans) {
+                mealPlansList.innerHTML = '';
+                if (plans.length === 0) {
+                    mealPlansList.innerHTML = '<p class="text-gray-500">You have no saved meal plans.</p>';
+                    return;
+                }
+                plans.forEach(plan => {
+                    const planElement = document.createElement('div');
+                    planElement.className = 'bg-white p-3 rounded-md shadow cursor-pointer hover:bg-gray-100';
+                    planElement.textContent = plan.name;
+                    planElement.addEventListener('click', () => loadPlanCalendar(plan));
+                    mealPlansList.appendChild(planElement);
+                });
+            }
+            
+            async function loadPlanCalendar(plan) {
+                currentMealPlan = plan;
+                mealPlannerTitle.textContent = plan.name;
+                planManagementView.classList.add('hidden');
+                planCalendarView.classList.remove('hidden');
+
+                const response = await fetch(`/api/meal-plans/${plan.id}`);
+                const planDetails = await response.json();
+                renderCalendar(planDetails.recipes);
+            }
+            
+            function renderCalendar(plannedRecipes) {
+                calendarBody.innerHTML = '';
+                const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                
+                days.forEach(day => {
+                    const dayCell = document.createElement('div');
+                    dayCell.className = 'border p-2 min-h-[200px] drop-zone';
+                    dayCell.dataset.day = day;
+                    dayCell.dataset.mealTime = 'Dinner'; // Simplified to just Dinner
+
+                    const recipeList = document.createElement('div');
+                    recipeList.className = 'recipe-list space-y-1';
+                    
+                    const recipesForSlot = plannedRecipes.filter(r => r.day_of_week === day); // Simplified filter
+                    recipesForSlot.forEach(r => {
+                        const recipeItem = document.createElement('div');
+                        recipeItem.className = 'bg-blue-100 p-1 rounded text-xs';
+                        recipeItem.textContent = r.recipe_name;
+                        recipeList.appendChild(recipeItem);
+                    });
+
+                    dayCell.appendChild(recipeList);
+                    calendarBody.appendChild(dayCell);
+                });
+                addDropZoneListeners();
+            }
+
+            createPlanBtn.addEventListener('click', async () => {
+                const name = newPlanNameInput.value.trim();
+                if (!name) {
+                    showToast('Please enter a name for your new meal plan.', 'error');
+                    return;
+                }
+                const response = await fetch('/api/meal-plans', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name }),
+                });
+                if (response.ok) {
+                    newPlanNameInput.value = '';
+                    showToast('New meal plan created!', 'success');
+                    const plansResponse = await fetch('/api/meal-plans');
+                    const plans = await plansResponse.json();
+                    renderMealPlansList(plans);
+                } else {
+                    showToast('Failed to create meal plan.', 'error');
+                }
+            });
+
+            plannerSearchInput.addEventListener('input', debounce(() => searchRecipes('nameOrId', plannerSearchInput.value, plannerSearchResults), 300));
+
+            // --- Drag and Drop Logic ---
+            function handleDragStart(e) {
+                e.dataTransfer.setData('text/plain', JSON.stringify({
+                    id: e.target.dataset.recipeId,
+                    name: e.target.dataset.recipeName
+                }));
+            }
+
+            function addDropZoneListeners() {
+                const dropZones = document.querySelectorAll('.drop-zone');
+                dropZones.forEach(zone => {
+                    zone.addEventListener('dragover', handleDragOver);
+                    zone.addEventListener('dragleave', handleDragLeave);
+                    zone.addEventListener('drop', handleDrop);
+                });
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault();
+                e.currentTarget.classList.add('drop-zone-active');
+            }
+             function handleDragLeave(e) {
+                e.preventDefault();
+                e.currentTarget.classList.remove('drop-zone-active');
+            }
+
+            async function handleDrop(e) {
+                e.preventDefault();
+                const target = e.currentTarget;
+                target.classList.remove('drop-zone-active');
+                
+                const recipeData = JSON.parse(e.dataTransfer.getData('text/plain'));
+                const { day, mealTime } = target.dataset;
+
+                const response = await fetch('/api/meal-plan-recipes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        meal_plan_id: currentMealPlan.id,
+                        recipe_id: recipeData.id,
+                        day_of_week: day,
+                        meal_time: mealTime,
+                    }),
+                });
+
+                if (response.ok) {
+                    showToast(`${recipeData.name} added to ${day}.`, 'success');
+                    const recipeList = target.querySelector('.recipe-list');
+                    if (recipeList) {
+                        const recipeItem = document.createElement('div');
+                        recipeItem.className = 'bg-blue-100 p-1 rounded text-xs';
+                        recipeItem.textContent = recipeData.name;
+                        recipeList.appendChild(recipeItem);
+                    }
+                } else {
+                    showToast('Failed to add recipe to plan.', 'error');
+                }
+            }
+            
+            // --- Modals Logic ---
+            const confirmModal = document.getElementById('confirm-modal');
+            const confirmModalText = document.getElementById('confirm-modal-text');
+            const confirmOkBtn = document.getElementById('confirm-ok-btn');
+            const confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+            const shareModal = document.getElementById('share-modal');
+            const copyShareLinkBtn = document.getElementById('copy-share-link-btn');
+            const shareLinkInput = document.getElementById('share-link-input');
+            let confirmCallback = null;
+
+            function showConfirm(message, onConfirm) {
+                confirmModalText.textContent = message;
+                confirmCallback = onConfirm;
+                toggleModal(confirmModal, true);
+            }
+
+            confirmOkBtn.addEventListener('click', () => {
+                if (confirmCallback) confirmCallback();
+                toggleModal(confirmModal, false);
+            });
+
+            confirmCancelBtn.addEventListener('click', () => toggleModal(confirmModal, false));
+            
+            copyShareLinkBtn.addEventListener('click', () => {
+                shareLinkInput.select();
+                try {
+                    document.execCommand('copy');
+                    showToast('Link copied to clipboard!', 'success');
+                } catch (err) {
+                    showToast('Failed to copy link.', 'error');
+                }
+                toggleModal(shareModal, false);
+            });
+
+            const closeButtons = document.querySelectorAll('.modal-close, .modal-overlay');
+            closeButtons.forEach(button => button.addEventListener('click', () => {
+                document.querySelectorAll('.modal').forEach(modal => toggleModal(modal, false));
+            }));
+
+            function toggleModal(modal, show) {
+                if (!modal) return;
+                modal.classList.toggle('opacity-0', !show);
+                modal.classList.toggle('pointer-events-none', !show);
+                document.body.classList.toggle('modal-active', show);
+            }
+
+            // --- Utilities ---
+            function debounce(func, wait) {
+                let timeout;
+                return (...args) => {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func.apply(this, args), wait);
+                };
+            }
+
+            function showToast(message, type = 'success') {
+                const toast = document.getElementById('toast-notification');
+                toast.textContent = message;
+                toast.className = `toast ${type} show`;
+                setTimeout(() => {
+                    toast.className = toast.className.replace('show', '');
+                }, 3000);
+            }
+
+             // --- Build Info ---
+             async function loadBuildInfo() {
+                try {
+                    const response = await fetch('/api/build-info');
+                    const data = await response.json();
+                    const buildDate = new Date(data.timestamp);
+                    const formattedDate = buildDate.toLocaleString('en-GB', { 
+                        day: '2-digit', 
+                        month: '2-digit', 
+                        year: 'numeric', 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                    document.getElementById('build-timestamp').textContent = `Live Status: ${formattedDate}`;
+                } catch (e) {
+                    console.error("Could not load build info:", e);
+                    document.getElementById('build-timestamp').textContent = 'Live status unavailable';
+                }
+            }
+
+
+            // Initial load
+            loadAndDisplayTags();
+            loadBuildInfo();
+        });
+    </script>
+</body>
+</html>
+
