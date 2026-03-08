@@ -390,9 +390,8 @@
                 searchRecipes('nameOrId', '', searchResultsContainer, true);
             });
 
-            // UPDATED: Added fetchAll parameter to allow empty queries
+            // UPDATED: Correctly route 'fetchAll' to the base recipes endpoint
             async function searchRecipes(type, query, container, fetchAll = false) {
-                // Modified check to allow fetchAll to bypass the return
                 if (!fetchAll && (!query || query.trim().length === 0)) { 
                     if (container.id === 'search-results') container.innerHTML = '';
                     return; 
@@ -400,18 +399,32 @@
                 document.getElementById('loader').classList.remove('hidden');
                 
                 let endpoint = '';
-                if (type === 'nameOrId') endpoint = `/api/recipes/search?q=${query}`;
-
-
-                else if (type === 'ingredients') endpoint = `/api/recipes/ingredients?q=${query}`;
-                else if (type === 'tag') endpoint = `/api/recipes/tags?q=${query}`;
+                if (fetchAll) {
+                    endpoint = '/api/recipes'; // Fetches the entire collection
+                } else if (type === 'nameOrId') {
+                    endpoint = `/api/recipes/search?q=${encodeURIComponent(query)}`;
+                } else if (type === 'ingredients') {
+                    endpoint = `/api/recipes/ingredients?q=${encodeURIComponent(query)}`;
+                } else if (type === 'tag') {
+                    endpoint = `/api/recipes/tags?q=${encodeURIComponent(query)}`;
+                }
                 
                 try {
                     const response = await fetch(endpoint);
+                    
+                    // Safety check in case the endpoint fails
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
                     const recipes = await response.json();
-                    if (container.id === 'search-results') currentResultSet = recipes.map(r => r.id);
+                    
+                    // Track current result set for modal navigation
+                    if (container.id === 'search-results') {
+                        currentResultSet = recipes.map(r => r.id);
+                    }
 
-                    container.innerHTML = recipes.length === 0 ? '<div class="md:col-span-2 bg-amber-50 p-6 rounded-2xl border border-amber-100 text-amber-800 font-medium text-center">No matching recipes found. Try a different term?</div>' : '';
+                    container.innerHTML = recipes.length === 0 ? '<div class="md:col-span-2 bg-amber-50 p-6 rounded-2xl border border-amber-100 text-amber-800 font-medium text-center">No recipes found.</div>' : '';
                     
                     recipes.forEach(recipe => {
                         const card = document.createElement('div');
@@ -439,6 +452,9 @@
                         card.addEventListener('dragstart', handleDragStart);
                         container.appendChild(card);
                     });
+                } catch (error) {
+                    console.error("Fetch error:", error);
+                    container.innerHTML = '<div class="md:col-span-2 bg-red-50 p-6 rounded-2xl border border-red-100 text-red-800 font-medium text-center">Failed to load recipes. Check console.</div>';
                 } finally {
                     document.getElementById('loader').classList.add('hidden');
                 }
