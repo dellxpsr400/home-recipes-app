@@ -106,11 +106,15 @@
                             <input type="text" id="search-by-ingredients" placeholder="Ingredients (e.g. garlic)..." class="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all">
                             <svg class="absolute left-3 top-3.5 text-slate-400" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 11-1 9"/><path d="m19 11-4-7"/><path d="M2 11h20"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4"/><path d="m4.5 11 4-7"/><path d="m8 11 1 9"/><path d="m12 11 0 9"/></svg>
                         </div>
-                        <button id="clear-search-btn" class="w-full text-slate-400 hover:text-slate-600 font-bold py-2 text-sm transition">
-                           Clear Search Results
-                        </button>
+                        <div class="flex gap-2">
+                            <button id="browse-all-btn" class="w-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold py-2 rounded-xl text-sm transition shadow-sm">
+                                Browse All Recipes
+                            </button>
+                            <button id="clear-search-btn" class="w-full bg-slate-50 text-slate-500 hover:bg-slate-100 font-bold py-2 rounded-xl text-sm transition shadow-sm">
+                               Clear
+                            </button>
+                        </div>
                     </div>
-
                     <div class="mt-8">
                         <button id="toggle-tags-btn" class="w-full flex justify-between items-center text-slate-900 font-bold group">
                             <span>Categories</span>
@@ -360,12 +364,14 @@
             const searchByIngredientsInput = document.getElementById('search-by-ingredients');
             const searchResultsContainer = document.getElementById('search-results');
             const clearSearchBtn = document.getElementById('clear-search-btn');
+            const browseAllBtn = document.getElementById('browse-all-btn'); // NEW: Added variable
 
             const debounce = (f, w) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f.apply(this, a), w); }; };
 
             searchByNameInput.addEventListener('input', debounce(() => searchRecipes('nameOrId', searchByNameInput.value, searchResultsContainer), 350));
             searchByIngredientsInput.addEventListener('input', debounce(() => searchRecipes('ingredients', searchByIngredientsInput.value, searchResultsContainer), 350));
             
+
             clearSearchBtn.addEventListener('click', () => {
                 searchByNameInput.value = ''; searchByIngredientsInput.value = '';
                 searchResultsContainer.innerHTML = '<div class="md:col-span-2 text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200"><p class="text-slate-400 font-medium">Discovery tools cleared.</p></div>';
@@ -373,8 +379,21 @@
                 currentResultSet = [];
             });
 
-            async function searchRecipes(type, query, container) {
-                if (!query || query.trim().length === 0) { 
+            // NEW: Browse All click logic
+            browseAllBtn.addEventListener('click', () => {
+                searchByNameInput.value = ''; 
+                searchByIngredientsInput.value = '';
+                selectedTagDisplay.textContent = 'Browsing: All Recipes';
+                tagsWrapper.classList.add('hidden');
+                document.getElementById('tags-arrow').style.transform = 'rotate(0deg)';
+                // We pass 'true' as the fourth argument to bypass the empty query block
+                searchRecipes('nameOrId', '', searchResultsContainer, true);
+            });
+
+            // UPDATED: Added fetchAll parameter to allow empty queries
+            async function searchRecipes(type, query, container, fetchAll = false) {
+                // Modified check to allow fetchAll to bypass the return
+                if (!fetchAll && (!query || query.trim().length === 0)) { 
                     if (container.id === 'search-results') container.innerHTML = '';
                     return; 
                 }
@@ -382,6 +401,8 @@
                 
                 let endpoint = '';
                 if (type === 'nameOrId') endpoint = `/api/recipes/search?q=${query}`;
+
+
                 else if (type === 'ingredients') endpoint = `/api/recipes/ingredients?q=${query}`;
                 else if (type === 'tag') endpoint = `/api/recipes/tags?q=${query}`;
                 
