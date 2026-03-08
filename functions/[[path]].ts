@@ -7,7 +7,6 @@ interface Env {
 // This captures the timestamp when the function is first initialized after a new deployment.
 const buildTimestamp = new Date().toISOString();
 
-
 // Helper function to render the read-only recipe share page
 function renderSharePage(recipe: any): Response {
     const ingredientsHtml = JSON.parse(recipe.ingredients).map((section: any) => `
@@ -63,7 +62,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         if (!token) return new Response('Share token missing', { status: 400 });
 
         // Find the recipe ID associated with the token
-        const share = await env.DB.prepare("SELECT recipe_id FROM recipe_shares WHERE token = ?").bind(token).first<{ recipe_id: number }>();
+        const share = (await env.DB.prepare("SELECT recipe_id FROM recipe_shares WHERE token = ?").bind(token).first()) as { recipe_id: number } | null;
         if (!share) return new Response('Recipe not found or share link is invalid', { status: 404 });
 
         // Fetch the recipe details
@@ -76,30 +75,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // --- PUBLIC BUILD INFO ROUTE ---
     if (path === '/api/build-info') {
-        return new Response(JSON.stringify({ timestamp: new Date().toISOString() }), {
+        return new Response(JSON.stringify({ timestamp: buildTimestamp }), {
             headers: { 'Content-Type': 'application/json' }
         });
     }
-
+    
 
     // --- PUBLIC API ROUTES (No login required) ---
     
-    // ---> NEW BITS GO HERE <---
-
-    // NEW: Get ALL Recipes (for Browse All button)
+    // NEW: Get ALL Recipes (for Browse All)
     if (path === '/api/recipes') {
         const { results } = await env.DB.prepare('SELECT id, name, tags FROM recipes ORDER BY id ASC').all();
         return new Response(JSON.stringify(results || []), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    // NEW: Get Total Recipe Count (for the header counter)
+    // NEW: Get Total Recipe Count
     if (path === '/api/recipes/count') {
-        const { count } = await env.DB.prepare('SELECT COUNT(*) as count FROM recipes').first<{ count: number }>();
-        return new Response(JSON.stringify({ total: count || 0 }), { headers: { 'Content-Type': 'application/json' } });
+        const result = (await env.DB.prepare('SELECT COUNT(*) as count FROM recipes').first()) as { count: number } | null;
+        return new Response(JSON.stringify({ total: result?.count || 0 }), { headers: { 'Content-Type': 'application/json' } });
     }
-
-    // ---> END OF NEW BITS <---
-
 
     if (path.startsWith('/api/recipes/search')) {
       const query = url.searchParams.get('q');
@@ -136,7 +130,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     if (path === '/api/tags') {
-      const { results } = await env.DB.prepare("SELECT tags FROM recipes WHERE tags IS NOT NULL AND tags != ''").all<{ tags: string }>();
+      const response = await env.DB.prepare("SELECT tags FROM recipes WHERE tags IS NOT NULL AND tags != ''").all();
+      const results = response.results as { tags: string }[];
       const uniqueTags = results.reduce((acc, { tags }) => {
         tags.split(',').forEach(tag => {
           const trimmedTag = tag.trim();
@@ -157,10 +152,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const identity = await getIdentity(request);
       if (identity) {
           const userId = identity.email;
-          const logCountResult = await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first<{ count: number }>();
+          const logCountResult = (await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first()) as { count: number } | null;
           responsePayload.log_count = logCountResult?.count ?? 0;
           
-          const ratingResult = await env.DB.prepare("SELECT rating, notes FROM recipe_ratings WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first<{ rating: number; notes: string }>();
+          const ratingResult = (await env.DB.prepare("SELECT rating, notes FROM recipe_ratings WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first()) as { rating: number; notes: string } | null;
           if (ratingResult) {
               responsePayload.user_rating = ratingResult.rating;
               responsePayload.user_notes = ratingResult.notes;
@@ -184,7 +179,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
      // POST /api/recipes/:id/share - Create a share link
     if (path.match(/^\/api\/recipes\/\d+\/share$/) && request.method === 'POST') {
         const recipeId = path.split('/')[3];
-        let share = await env.DB.prepare("SELECT token FROM recipe_shares WHERE recipe_id = ?").bind(recipeId).first<{ token: string }>();
+        let share = (await env.DB.prepare("SELECT token FROM recipe_shares WHERE recipe_id = ?").bind(recipeId).first()) as { token: string } | null;
 
         if (share) {
             return new Response(JSON.stringify({ token: share.token }), { headers: { 'Content-Type': 'application/json' } });
@@ -198,7 +193,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
     // POST /api/ratings - Save or update a rating and notes for a recipe
     if (path === '/api/ratings' && request.method === 'POST') {
-        const { recipe_id, rating, notes } = await request.json<{ recipe_id: number; rating: number; notes: string; }>();
+        const { recipe_id, rating, notes } = (await request.json()) as { recipe_id: number; rating: number; notes: string; };
         if (!recipe_id || !rating) {
             return new Response('recipe_id and rating are required', { status: 400 });
         }
@@ -217,7 +212,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     if (path === '/api/meal-plans' && request.method === 'POST') {
-        const { name } = await request.json<{ name: string }>();
+        const { name } = (await request.json()) as { name: string };
         if (!name) return new Response('Meal plan name is required', { status: 400 });
         const { meta } = await env.DB.prepare("INSERT INTO meal_plans (user_id, name) VALUES (?, ?)").bind(userId, name).run();
         return new Response(JSON.stringify({ success: true, id: meta.last_row_id }), { status: 201 });
@@ -241,12 +236,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // POST /api/meal-plans/:id/shopping-list - Generate a shopping list for a plan
     if (path.match(/^\/api\/meal-plans\/\d+\/shopping-list$/) && request.method === 'POST') {
         const planId = path.split('/')[3];
-        const plan = await env.DB.prepare("SELECT * FROM meal_plans WHERE id = ? AND user_id = ?").bind(planId, userId).first<{ id: number; name: string }>();
+        const plan = (await env.DB.prepare("SELECT * FROM meal_plans WHERE id = ? AND user_id = ?").bind(planId, userId).first()) as { id: number; name: string } | null;
         if (!plan) return new Response('Meal plan not found', { status: 404 });
 
-        const { results: plannedRecipes } = await env.DB.prepare(
+        const res = await env.DB.prepare(
             `SELECT r.ingredients FROM meal_plan_recipes mpr JOIN recipes r ON mpr.recipe_id = r.id WHERE mpr.meal_plan_id = ?`
-        ).bind(planId).all<{ ingredients: string }>();
+        ).bind(planId).all();
+        const plannedRecipes = res.results as { ingredients: string }[];
 
         if (plannedRecipes.length === 0) {
             return new Response(JSON.stringify({ success: true, message: 'No recipes in plan' }));
@@ -276,7 +272,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
     
     if (path === '/api/meal-plan-recipes' && request.method === 'POST') {
-        const { meal_plan_id, recipe_id, day_of_week, meal_time } = await request.json<{ meal_plan_id: number; recipe_id: number; day_of_week: string; meal_time: string; }>();
+        const { meal_plan_id, recipe_id, day_of_week, meal_time } = (await request.json()) as { meal_plan_id: number; recipe_id: number; day_of_week: string; meal_time: string; };
         if (!meal_plan_id || !recipe_id || !day_of_week || !meal_time) {
             return new Response('All fields are required', { status: 400 });
         }
@@ -306,7 +302,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
     
     if (path.startsWith('/api/meal-log') && request.method === 'POST') {
-        const { recipe_id, eaten_date, notes } = await request.json<{ recipe_id: number; eaten_date: string; notes: string; }>();
+        const { recipe_id, eaten_date, notes } = (await request.json()) as { recipe_id: number; eaten_date: string; notes: string; };
         if (!recipe_id || !eaten_date) return new Response('recipe_id and eaten_date are required', { status: 400 });
         await env.DB.prepare("INSERT INTO meal_log (recipe_id, eaten_date, user_id, notes) VALUES (?, ?, ?, ?)").bind(recipe_id, eaten_date, userId, notes).run();
         return new Response(JSON.stringify({ success: true }), { status: 201 });
@@ -321,7 +317,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     if (path === '/api/shopping-list' && request.method === 'POST') {
-      const { items, recipe_name } = await request.json<{ items: { name: string; quantity: string; unit: string; }[]; recipe_name: string; }>();
+      const { items, recipe_name } = (await request.json()) as { items: { name: string; quantity: string; unit: string; }[]; recipe_name: string; };
       if (!items || !Array.isArray(items) || items.length === 0 || !recipe_name) {
         return new Response('A recipe_name and an array of items are required.', { status: 400 });
       }
@@ -332,7 +328,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     if (path === '/api/shopping-list/update' && request.method === 'PUT') {
-        const { updates } = await request.json<{ updates: { id: string; is_checked: boolean; }[] }>();
+        const { updates } = (await request.json()) as { updates: { id: string; is_checked: boolean; }[] };
         if (!updates || !Array.isArray(updates)) {
             return new Response('An array of updates is required.', { status: 400 });
         }
@@ -377,4 +373,3 @@ async function getIdentity(request: Request): Promise<{ email: string } | null> 
         return null;
     }
 }
-
