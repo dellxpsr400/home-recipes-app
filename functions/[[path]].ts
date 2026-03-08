@@ -83,6 +83,24 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
 
     // --- PUBLIC API ROUTES (No login required) ---
+    
+    // ---> NEW BITS GO HERE <---
+
+    // NEW: Get ALL Recipes (for Browse All button)
+    if (path === '/api/recipes') {
+        const { results } = await env.DB.prepare('SELECT id, name, tags FROM recipes ORDER BY id ASC').all();
+        return new Response(JSON.stringify(results || []), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // NEW: Get Total Recipe Count (for the header counter)
+    if (path === '/api/recipes/count') {
+        const { count } = await env.DB.prepare('SELECT COUNT(*) as count FROM recipes').first<{ count: number }>();
+        return new Response(JSON.stringify({ total: count || 0 }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // ---> END OF NEW BITS <---
+
+
     if (path.startsWith('/api/recipes/search')) {
       const query = url.searchParams.get('q');
       if (!query) return new Response('Query parameter "q" is required', { status: 400 });
