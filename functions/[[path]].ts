@@ -114,57 +114,58 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     if (path.startsWith('/api/recipes/ingredients')) {
-        const ingredients = url.searchParams.get('q')?.split(',');
-        if (!ingredients || ingredients.length === 0) return new Response('Query parameter "q" with comma-separated ingredients is required', { status: 400 });
-        const placeholders = ingredients.map(() => 'ingredients LIKE ?').join(' AND ');
-        const bindings = ingredients.map(i => `%${i.trim()}%`);
-        const { results } = await env.DB.prepare(`SELECT * FROM recipes WHERE ${placeholders}`).bind(...bindings).all();
-        return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+    // Get a Single Recipe by ID (now includes tags)
+    if (url.pathname.startsWith('/api/recipes/') && !url.pathname.endsWith('/log') && !url.pathname.includes('/search/')) {
+      const id = url.pathname.split('/')[3];
+      const recipeData = await env.DB.prepare('SELECT * FROM recipes WHERE id = ?1').bind(id).first();
+      if (!recipeData) return jsonResponse({ error: 'Recipe not found.' }, 404);
+      const recipe = { ...recipeData, ingredients: JSON.parse(recipeData.ingredients as string), instructions: JSON.parse(recipeData.instructions as string) };
+      return jsonResponse(recipe);
     }
-
-    if (path.startsWith('/api/recipes/tags')) {
-      const query = url.searchParams.get('q');
-      if (!query) return new Response('Query parameter "q" is required', { status: 400 });
-      const { results } = await env.DB.prepare("SELECT * FROM recipes WHERE tags LIKE ?").bind(`%${query}%`).all();
-      return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
-    }
-
-    if (path === '/api/tags') {
-      const response = await env.DB.prepare("SELECT tags FROM recipes WHERE tags IS NOT NULL AND tags != ''").all();
-      const results = response.results as { tags: string }[];
-      const uniqueTags = results.reduce((acc, { tags }) => {
-        tags.split(',').forEach(tag => {
-          const trimmedTag = tag.trim();
-          if (trimmedTag) acc.add(trimmedTag);
-        });
-        return acc;
-      }, new Set<string>());
-      return new Response(JSON.stringify(Array.from(uniqueTags)), { headers: { 'Content-Type': 'application/json' } });
-    }
-    
-    // Get a single recipe by ID (publicly accessible, with extra data for logged-in users)
-    if (path.match(/^\/api\/recipes\/\d+$/)) {
-      const recipeId = path.split('/').pop();
-      const recipe = await env.DB.prepare("SELECT * FROM recipes WHERE id = ?").bind(recipeId).first<any>();
-      if (!recipe) return new Response('Recipe not found', { status: 404 });
-
-      let responsePayload: any = { ...recipe, log_count: 0, user_rating: null, user_notes: null };
-      const identity = await getIdentity(request);
-      if (identity) {
-          const userId = identity.email;
-          const logCountResult = (await env.DB.prepare("SELECT COUNT(*) as count FROM meal_log WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first()) as { count: number } | null;
-          responsePayload.log_count = logCountResult?.count ?? 0;
-          
-          const ratingResult = (await env.DB.prepare("SELECT rating, notes FROM recipe_ratings WHERE recipe_id = ? AND user_id = ?").bind(recipeId, userId).first()) as { rating: number; notes: string } | null;
-          if (ratingResult) {
-              responsePayload.user_rating = ratingResult.rating;
-              responsePayload.user_notes = ratingResult.notes;
-          }
-      }
       
-      return new Response(JSON.stringify(responsePayload), { headers: { 'Content-Type': 'application/json' } });
-    }
+    // --- AUTOMATION ROUTES ---
     
+    // POST /api/auto-add - Webhook for n8n to push parsed recipes
+    if (url.pathname === '/api/auto-add' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization');
+        
+        // Security check: Only allow requests with our specific secret token
+        if (authHeader !== 'Bearer N8N_AUTO_ADD_SECRET_2026') {
+            return jsonResponse({ error: 'Unauthorized: Invalid token.' }, 401);
+        }
+
+        try {
+            const payload = await request.json();
+            const { id, name, tags, ingredients, instructions } = payload as any;
+
+            if (!id || !name || !ingredients || !instructions) {
+                return jsonResponse({ error: 'Missing required recipe fields.' }, 400);
+            }
+
+            // UPSERT logic: Insert if new, overwrite if it already exists
+            await env.DB.prepare(`
+                INSERT INTO recipes (id, name, tags, ingredients, instructions) 
+                VALUES (?1, ?2, ?3, ?4, ?5)
+                ON CONFLICT(id) DO UPDATE SET 
+                    name = excluded.name, 
+                    tags = excluded.tags, 
+                    ingredients = excluded.ingredients, 
+                    instructions = excluded.instructions
+            `).bind(
+                id, 
+                name, 
+                tags || 'Pending Update', 
+                typeof ingredients === 'string' ? ingredients : JSON.stringify(ingredients), 
+                typeof instructions === 'string' ? instructions : JSON.stringify(instructions)
+            ).run();
+
+            return jsonResponse({ success: true, message: `Recipe #${id} saved successfully.` }, 201);
+        } catch (e: any) {
+            console.error("Auto-add error:", e);
+            return jsonResponse({ error: `Database error: ${e.message}` }, 500);
+        }
+    }
+
     // --- SECURE API ROUTES (Login required) ---
 
     const identity = await getIdentity(request);

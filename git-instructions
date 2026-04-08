@@ -4,6 +4,6 @@ git status
 
 git add .
 
-git commit -m "updating index.html to implement consolidated shopping list, fix stacking #4: 1240 19/9/25"
+git commit -m "updating index.html to implement stepping through recipes 1807 11/01/26"
 
 git push origin meal-planner

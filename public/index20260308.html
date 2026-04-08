@@ -1,0 +1,774 @@
+<!-- public/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Recipes App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; min-height: 100vh; transition: background-color 0.3s ease; scroll-behavior: smooth; }
+        .modal { transition: opacity 0.25s ease; }
+        body.modal-active { overflow: hidden; }
+        
+        /* Premium Shadows & Blurs */
+        .glass-overlay { backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+        .card-shadow { shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05); }
+        .card-shadow:hover { box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
+        
+        /* Ingredient Interaction */
+        .ingredient-item { transition: all 0.2s ease; border-radius: 8px; }
+        .ingredient-item:hover { background-color: #f8fafc; }
+        .ingredient-checkbox:checked + span { text-decoration: line-through; color: #94a3b8; }
+        
+        .checked-item { text-decoration: line-through; color: #94a3b8; }
+        
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 16px 32px;
+            border-radius: 12px;
+            color: white;
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 1000;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(-12px); }
+        .toast.success { background-color: #059669; }
+        .toast.error { background-color: #dc2626; }
+        
+        /* Star rating styles */
+        .star-rating { display: flex; flex-direction: row-reverse; justify-content: flex-end; font-size: 2em; cursor: pointer; }
+        .star-rating input { display: none; }
+        .star-rating label { color: #e2e8f0; transition: color 0.2s; padding: 0 2px; }
+        .star-rating input:checked ~ label,
+        .star-rating label:hover,
+        .star-rating label:hover ~ label { color: #fbbf24; }
+        
+        /* Layout Utilities */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #printable-recipe, #printable-recipe * { visibility: visible; }
+            #printable-recipe { position: absolute; left: 0; top: 0; width: 100%; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 leading-relaxed">
+
+    <div id="toast-notification" class="toast"></div>
+
+    <div class="container mx-auto p-4 md:p-8 max-w-6xl">
+        <!-- Main Application Header -->
+        <header class="flex flex-col md:flex-row md:justify-between md:items-end mb-10 gap-6">
+            <div>
+                <h1 class="text-3xl md:text-5xl font-extrabold text-slate-900 tracking-tight">Recipe Finder</h1>
+                <p id="user-greeting" class="text-slate-500 font-medium mt-1"></p>
+            </div>
+            <nav class="flex flex-wrap gap-2">
+                <button id="meal-planner-button" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>
+                    Planner
+                </button>
+                <button id="meal-log-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    History
+                </button>
+                <button id="shopping-list-button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-xl shadow-sm transition-all flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                    Shopping
+                </button>
+            </nav>
+        </header>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Search & Filters Sidebar -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Discovery</h2>
+                    
+                    <div class="space-y-4" id="search-container">
+                        <div class="relative">
+                            <input type="text" id="search-by-name" placeholder="Name or number..." class="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all">
+                            <svg class="absolute left-3 top-3.5 text-slate-400" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                        </div>
+                        <div class="relative">
+                            <input type="text" id="search-by-ingredients" placeholder="Ingredients (e.g. garlic)..." class="w-full p-3 pl-10 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all">
+                            <svg class="absolute left-3 top-3.5 text-slate-400" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 11-1 9"/><path d="m19 11-4-7"/><path d="M2 11h20"/><path d="m3.5 11 1.6 7.4a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 2-1.6l1.7-7.4"/><path d="m4.5 11 4-7"/><path d="m8 11 1 9"/><path d="m12 11 0 9"/></svg>
+                        </div>
+                        <button id="clear-search-btn" class="w-full text-slate-400 hover:text-slate-600 font-bold py-2 text-sm transition">
+                           Clear Search Results
+                        </button>
+                    </div>
+
+                    <div class="mt-8">
+                        <button id="toggle-tags-btn" class="w-full flex justify-between items-center text-slate-900 font-bold group">
+                            <span>Categories</span>
+                            <span id="tags-arrow" class="text-slate-400 group-hover:text-slate-600 transition-transform">▼</span>
+                        </button>
+                        <div id="tags-wrapper" class="hidden mt-4">
+                            <div id="tags-container" class="flex flex-wrap gap-2"></div>
+                        </div>
+                        <p id="selected-tag-display" class="text-xs font-bold text-indigo-600 mt-2 uppercase"></p>
+                    </div>
+                </div>
+
+                <div class="hidden lg:block text-center pt-4">
+                    <p id="build-timestamp" class="text-[10px] text-slate-400 font-mono"></p>
+                </div>
+            </div>
+
+            <!-- Results Feed -->
+            <div class="lg:col-span-8">
+                <div id="search-results" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="md:col-span-2 text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                        <p class="text-slate-400 font-medium">Use the discovery tools to find your next meal.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recipe Details Modal -->
+    <div id="recipe-modal" class="modal opacity-0 pointer-events-none fixed inset-0 flex items-center justify-center z-40 p-4">
+        <div class="modal-overlay absolute inset-0 bg-slate-900/40 glass-overlay"></div>
+        <div class="modal-container bg-white w-full max-w-3xl mx-auto rounded-3xl shadow-2xl z-50 overflow-hidden relative flex flex-col" style="max-height: 92vh;">
+            
+            <!-- Floating Navigation (Desktop Only) -->
+            <button id="prev-recipe-btn" title="Previous (Left Arrow)" class="absolute -left-20 top-1/2 -translate-y-1/2 hidden lg:flex items-center justify-center w-14 h-14 bg-white rounded-full shadow-xl text-slate-400 hover:text-indigo-600 transition-all hover:scale-110">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button id="next-recipe-btn" title="Next (Right Arrow)" class="absolute -right-20 top-1/2 -translate-y-1/2 hidden lg:flex items-center justify-center w-14 h-14 bg-white rounded-full shadow-xl text-slate-400 hover:text-indigo-600 transition-all hover:scale-110">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+
+            <!-- STICKY Header - FIXED: items-start and flex-grow to prevent title truncation -->
+            <div class="sticky top-0 bg-white/95 backdrop-blur-md z-10 px-8 py-5 border-b border-slate-100 flex justify-between items-start">
+                <div class="flex-grow pr-6 min-w-0">
+                    <p id="modal-counter" class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-1"></p>
+                    <h2 id="recipe-modal-title" class="text-xl md:text-3xl font-black text-slate-900 leading-tight"></h2>
+                </div>
+                <div class="flex items-center gap-2 md:gap-4 shrink-0 pt-1">
+                    <!-- Header Quick Nav -->
+                    <div id="header-nav-group" class="flex items-center bg-slate-100 rounded-xl p-1">
+                        <button id="header-prev-btn" class="p-1.5 text-indigo-600 disabled:text-slate-300 hover:bg-white hover:shadow-sm rounded-lg transition" title="Previous">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                        </button>
+                        <button id="header-next-btn" class="p-1.5 text-indigo-600 disabled:text-slate-300 hover:bg-white hover:shadow-sm rounded-lg transition" title="Next">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                        </button>
+                    </div>
+                    <button id="print-recipe-btn" title="Print" class="p-2 text-slate-400 hover:text-slate-900 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    </button>
+                    <button class="modal-close p-2 text-slate-400 hover:text-slate-900 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="modal-scroll-area overflow-y-auto custom-scrollbar flex-grow px-8 py-6">
+                <div id="recipe-modal-content" class="text-slate-700"></div>
+
+                <!-- Bottom Navigation for Mobile -->
+                <div class="flex justify-between items-center mt-12 pt-6 border-t border-slate-100 md:hidden pb-4">
+                    <button id="mobile-prev-btn" class="flex items-center gap-2 text-indigo-600 font-black disabled:text-slate-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                        PREV
+                    </button>
+                    <span id="mobile-counter-display" class="text-xs text-slate-400 font-mono font-bold"></span>
+                    <button id="mobile-next-btn" class="flex items-center gap-2 text-indigo-600 font-black disabled:text-slate-300">
+                        NEXT
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modals Section -->
+    <div id="shopping-list-modal" class="modal opacity-0 pointer-events-none fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div class="modal-overlay absolute inset-0 bg-slate-900/40 glass-overlay"></div>
+        <div class="modal-container bg-white w-full max-w-lg mx-auto rounded-3xl shadow-2xl z-50 overflow-hidden">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                <p class="text-2xl font-black text-slate-900">Shopping List</p>
+                <button class="modal-close text-slate-400 hover:text-slate-900 transition"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="p-6 max-h-[70vh] overflow-y-auto custom-scrollbar" id="shopping-list-content"></div>
+            <div class="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button id="update-checked-btn" class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-xl shadow-sm">Update</button>
+                <button id="clear-checked-items-btn" class="bg-slate-200 text-slate-700 font-bold py-2 px-6 rounded-xl">Clear Ticked</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="meal-log-modal" class="modal opacity-0 pointer-events-none fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div class="modal-overlay absolute inset-0 bg-slate-900/40 glass-overlay"></div>
+        <div class="modal-container bg-white w-full max-w-2xl mx-auto rounded-3xl shadow-2xl z-50 overflow-hidden flex flex-col" style="max-height: 85vh;">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white">
+                <p class="text-2xl font-black text-slate-900">Meal History</p>
+                <button class="modal-close text-slate-400 hover:text-slate-900 transition"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div id="meal-log-content" class="p-6 overflow-y-auto custom-scrollbar space-y-6"></div>
+        </div>
+    </div>
+
+    <div id="confirm-modal" class="modal opacity-0 pointer-events-none fixed inset-0 flex items-center justify-center z-[70] p-4">
+        <div class="modal-overlay absolute inset-0 bg-slate-900/60 glass-overlay"></div>
+        <div class="modal-container bg-white w-full max-w-sm mx-auto rounded-3xl shadow-2xl z-50 p-8 text-center">
+            <h3 class="text-xl font-black text-slate-900 mb-2">Confirm Action</h3>
+            <p id="confirm-modal-text" class="text-slate-500 mb-8"></p>
+            <div class="flex flex-col gap-2">
+                <button id="confirm-ok-btn" class="bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-xl transition shadow-sm">Confirm</button>
+                <button id="confirm-cancel-btn" class="text-slate-400 font-bold py-2 hover:text-slate-600 transition">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="share-modal" class="modal opacity-0 pointer-events-none fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div class="modal-overlay absolute inset-0 bg-slate-900/40 glass-overlay"></div>
+        <div class="modal-container bg-white w-full max-w-lg mx-auto rounded-3xl shadow-2xl z-50 p-8">
+            <div class="flex justify-between items-center mb-6">
+                <p class="text-2xl font-black text-slate-900">Share Recipe</p>
+                <button class="modal-close text-slate-400 hover:text-slate-900 transition"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <p class="text-slate-500 mb-4 font-medium">Anyone with this link can view this recipe:</p>
+            <div class="flex gap-2">
+                <input type="text" id="share-link-input" readonly class="flex-grow p-3 bg-slate-50 border border-slate-200 rounded-xl font-mono text-sm">
+                <button id="copy-share-link-btn" class="bg-indigo-600 text-white font-bold px-5 rounded-xl transition-all active:scale-95">Copy</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="meal-planner-modal" class="modal opacity-0 pointer-events-none fixed inset-0 flex items-center justify-center z-50 p-4">
+        <div class="modal-overlay absolute inset-0 bg-slate-900/40 glass-overlay"></div>
+        <div class="modal-container bg-white w-full max-w-7xl mx-auto rounded-3xl shadow-2xl z-50 overflow-hidden flex flex-col" style="max-height: 92vh;">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                <p id="meal-planner-title" class="text-2xl font-black text-slate-900">Meal Planner</p>
+                <button class="modal-close text-slate-400 hover:text-slate-900 transition"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+            </div>
+            <div class="p-6 overflow-y-auto custom-scrollbar flex-grow">
+                <div id="meal-planner-content">
+                    <div id="plan-management-view">
+                        <div class="bg-slate-50 p-6 rounded-2xl mb-8">
+                            <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Create New Plan</h3>
+                            <div class="flex gap-2">
+                                <input type="text" id="new-plan-name" placeholder="e.g. Next Week's Dinners" class="p-3 bg-white border border-slate-200 rounded-xl flex-grow outline-none focus:ring-2 focus:ring-amber-500 transition-all">
+                                <button id="create-plan-btn" class="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-8 rounded-xl shadow-sm transition-all">Create</button>
+                            </div>
+                        </div>
+                        <h3 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Your Active Plans</h3>
+                        <div id="meal-plans-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+                    </div>
+                    <div id="plan-calendar-view" class="hidden flex flex-col lg:flex-row gap-8">
+                        <div class="lg:w-80 space-y-6 shrink-0">
+                             <button id="back-to-plans-btn" class="w-full text-slate-500 hover:text-slate-900 font-bold py-2 transition flex items-center justify-center gap-2">← Back to all plans</button>
+                             <div class="bg-indigo-50 p-5 rounded-2xl border border-indigo-100">
+                                 <h4 class="font-bold text-indigo-900 text-sm mb-3">Power Actions</h4>
+                                 <button id="generate-shopping-list-btn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl shadow-sm hover:bg-indigo-700 transition">Get Ingredients List</button>
+                             </div>
+                             <div class="space-y-4">
+                                <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest">Recipe Picker</h4>
+                                <input type="text" id="planner-search-input" placeholder="Search to drag..." class="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-amber-500">
+                                <div id="planner-search-results" class="space-y-2 h-[400px] overflow-y-auto custom-scrollbar pr-2"></div>
+                             </div>
+                        </div>
+                        <div class="flex-grow">
+                             <div id="calendar-body" class="grid grid-cols-1 md:grid-cols-7 gap-4"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loader Backdrop -->
+    <div id="loader" class="fixed inset-0 bg-slate-900/10 glass-overlay flex items-center justify-center hidden z-[100]">
+        <div class="bg-white p-6 rounded-3xl shadow-2xl flex flex-col items-center gap-4">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-indigo-600"></div>
+            <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Cooking...</p>
+        </div>
+    </div>
+    
+    <div id="printable-recipe" class="hidden"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function () {
+            // --- Shared Application State ---
+            let currentUserEmail = null;
+            let currentMealPlan = null;
+            let currentRecipeId = null;
+            let currentResultSet = [];
+
+            // --- Authentication & Greeting ---
+            const userGreeting = document.getElementById('user-greeting');
+            try {
+                const identityRes = await fetch('/cdn-cgi/access/get-identity');
+                if (identityRes.ok) {
+                    const identity = await identityRes.json();
+                    currentUserEmail = identity.email;
+                    const nameMap = {'nicolasj.oliver@gmail.com': 'Nick', 'rachelcasey246@gmail.com': 'Rach', 'rosieoliver168@gmail.com': 'Rosie'};
+                    userGreeting.textContent = `Hello, ${nameMap[currentUserEmail] || currentUserEmail.split('@')[0]}`;
+                } else { userGreeting.textContent = 'Welcome back!'; }
+            } catch (e) { userGreeting.textContent = 'Family Cookbook'; }
+
+            // --- Categories (Tags) ---
+            const tagsContainer = document.getElementById('tags-container');
+            const toggleTagsBtn = document.getElementById('toggle-tags-btn');
+            const tagsWrapper = document.getElementById('tags-wrapper');
+            const tagsArrow = document.getElementById('tags-arrow');
+            const selectedTagDisplay = document.getElementById('selected-tag-display');
+
+            toggleTagsBtn.addEventListener('click', () => {
+                const isTagsHidden = tagsWrapper.classList.toggle('hidden');
+                tagsArrow.style.transform = isTagsHidden ? 'rotate(0deg)' : 'rotate(180deg)';
+                if (!isTagsHidden) selectedTagDisplay.textContent = '';
+            });
+
+            async function loadAndDisplayTags() {
+                try {
+                    const response = await fetch('/api/tags');
+                    const tags = await response.json();
+                    tagsContainer.innerHTML = '';
+                    tags.sort().forEach(tag => {
+                        const button = document.createElement('button');
+                        button.textContent = tag;
+                        button.className = 'bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 font-bold py-1.5 px-3.5 rounded-lg text-xs transition-all border border-transparent hover:border-indigo-100';
+                        button.addEventListener('click', () => {
+                            searchRecipes('tag', tag, document.getElementById('search-results'));
+                            tagsWrapper.classList.add('hidden');
+                            tagsArrow.style.transform = 'rotate(0deg)';
+                            selectedTagDisplay.textContent = `Filtering by: ${tag}`;
+                        });
+                        tagsContainer.appendChild(button);
+                    });
+                } catch (e) { console.error("Tags fetch failed", e); }
+            }
+            
+            // --- Search Functionality ---
+            const searchByNameInput = document.getElementById('search-by-name');
+            const searchByIngredientsInput = document.getElementById('search-by-ingredients');
+            const searchResultsContainer = document.getElementById('search-results');
+            const clearSearchBtn = document.getElementById('clear-search-btn');
+
+            const debounce = (f, w) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f.apply(this, a), w); }; };
+
+            searchByNameInput.addEventListener('input', debounce(() => searchRecipes('nameOrId', searchByNameInput.value, searchResultsContainer), 350));
+            searchByIngredientsInput.addEventListener('input', debounce(() => searchRecipes('ingredients', searchByIngredientsInput.value, searchResultsContainer), 350));
+            
+            clearSearchBtn.addEventListener('click', () => {
+                searchByNameInput.value = ''; searchByIngredientsInput.value = '';
+                searchResultsContainer.innerHTML = '<div class="md:col-span-2 text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-200"><p class="text-slate-400 font-medium">Discovery tools cleared.</p></div>';
+                selectedTagDisplay.textContent = '';
+                currentResultSet = [];
+            });
+
+            async function searchRecipes(type, query, container) {
+                if (!query || query.trim().length === 0) { 
+                    if (container.id === 'search-results') container.innerHTML = '';
+                    return; 
+                }
+                document.getElementById('loader').classList.remove('hidden');
+                
+                let endpoint = '';
+                if (type === 'nameOrId') endpoint = `/api/recipes/search?q=${query}`;
+                else if (type === 'ingredients') endpoint = `/api/recipes/ingredients?q=${query}`;
+                else if (type === 'tag') endpoint = `/api/recipes/tags?q=${query}`;
+                
+                try {
+                    const response = await fetch(endpoint);
+                    const recipes = await response.json();
+                    if (container.id === 'search-results') currentResultSet = recipes.map(r => r.id);
+
+                    container.innerHTML = recipes.length === 0 ? '<div class="md:col-span-2 bg-amber-50 p-6 rounded-2xl border border-amber-100 text-amber-800 font-medium text-center">No matching recipes found. Try a different term?</div>' : '';
+                    
+                    recipes.forEach(recipe => {
+                        const card = document.createElement('div');
+                        card.className = 'bg-white p-6 rounded-2xl shadow-sm border border-slate-100 cursor-pointer card-shadow transition-all group';
+                        card.draggable = true; card.dataset.recipeId = recipe.id; card.dataset.recipeName = recipe.name;
+                        
+                        let tagsHtml = '';
+                        if(recipe.tags) {
+                            tagsHtml = `<div class="flex flex-wrap gap-1 mt-3">` +
+                                       recipe.tags.split(',').slice(0,3).map(t => `<span class="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 bg-slate-50 text-slate-400 rounded-md">${t.trim()}</span>`).join('') +
+                                       `</div>`;
+                        }
+
+                        card.innerHTML = `
+                            <div class="flex justify-between items-start">
+                                <span class="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Recipe #${recipe.id}</span>
+                                <div class="bg-indigo-50 text-indigo-600 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                                </div>
+                            </div>
+                            <h3 class="font-bold text-lg text-slate-900 mt-2 leading-tight">${recipe.name}</h3>
+                            ${tagsHtml}
+                        `;
+                        card.addEventListener('click', () => showRecipeDetails(recipe.id));
+                        card.addEventListener('dragstart', handleDragStart);
+                        container.appendChild(card);
+                    });
+                } finally {
+                    document.getElementById('loader').classList.add('hidden');
+                }
+            }
+
+            // --- Modal: Navigation ---
+            const navigateRecipe = (direction) => {
+                if (currentResultSet.length === 0) return;
+                const currentIndex = currentResultSet.indexOf(parseInt(currentRecipeId));
+                const nextIndex = currentIndex + direction;
+                if (nextIndex >= 0 && nextIndex < currentResultSet.length) {
+                    showRecipeDetails(currentResultSet[nextIndex]);
+                }
+            };
+
+            // --- Modal: View Orchestration ---
+            const recipeModal = document.getElementById('recipe-modal');
+            const recipeModalTitle = document.getElementById('recipe-modal-title');
+            const recipeModalContent = document.getElementById('recipe-modal-content');
+            
+            async function showRecipeDetails(recipeId) {
+                currentRecipeId = recipeId;
+                const response = await fetch(`/api/recipes/${recipeId}`);
+                if (!response.ok) { showToast('Recipe missing or inaccessible.', 'error'); return; }
+                const recipe = await response.json();
+                recipeModalTitle.textContent = recipe.name;
+
+                // Sync navigation labels
+                const idx = currentResultSet.indexOf(parseInt(recipeId));
+                const total = currentResultSet.length;
+                if (idx !== -1 && total > 1) {
+                    const label = `Item ${idx + 1} of ${total}`;
+                    document.getElementById('modal-counter').textContent = label;
+                    document.getElementById('mobile-counter-display').textContent = `${idx + 1} / ${total}`;
+                    
+                    document.getElementById('header-nav-group').classList.remove('hidden');
+                    document.getElementById('header-prev-btn').disabled = (idx === 0);
+                    document.getElementById('header-next-btn').disabled = (idx === total - 1);
+                    
+                    document.getElementById('prev-recipe-btn').style.display = (idx === 0) ? 'none' : 'flex';
+                    document.getElementById('next-recipe-btn').style.display = (idx === total - 1) ? 'none' : 'flex';
+                    
+                    document.getElementById('mobile-prev-btn').disabled = (idx === 0);
+                    document.getElementById('mobile-next-btn').disabled = (idx === total - 1);
+                } else {
+                    document.getElementById('modal-counter').textContent = `Recipe #${recipe.id}`;
+                    document.getElementById('header-nav-group').classList.add('hidden');
+                    document.getElementById('prev-recipe-btn').style.display = 'none';
+                    document.getElementById('next-recipe-btn').style.display = 'none';
+                }
+
+                const servesHtml = recipe.serves ? `<div class="inline-flex items-center gap-2 bg-slate-100 px-3 py-1 rounded-full text-xs font-bold text-slate-500 mb-6 uppercase tracking-wider"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Serves ${recipe.serves}</div>` : '';
+                
+                let ingredientsHtml = '<div class="mb-10"><h4 class="text-sm font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Ingredients</h4>';
+                try {
+                    const ingredientsData = JSON.parse(recipe.ingredients);
+                    ingredientsData.forEach(section => {
+                        if (section.section_title) {
+                            ingredientsHtml += `<h5 class="text-xs font-black mt-6 mb-3 text-indigo-500 uppercase tracking-widest flex items-center gap-2"><span class="h-px bg-indigo-100 flex-grow"></span>${section.section_title}<span class="h-px bg-indigo-100 flex-grow"></span></h5>`;
+                        }
+                        const itemsHtml = section.items.map(ing => {
+                            const fullText = `${ing.quantity || ''} ${ing.unit || ''} ${ing.name} ${ing.notes || ''}`.trim();
+                             return `
+                             <label class="ingredient-item flex items-center p-2 group cursor-pointer">
+                                <input type="checkbox" class="mr-4 h-5 w-5 rounded-lg ingredient-checkbox border-slate-300 text-indigo-600 focus:ring-indigo-500 transition-all" 
+                                    data-name="${ing.name}" data-quantity="${ing.quantity || ''}" data-unit="${ing.unit || ''}">
+                                <span class="text-slate-700 font-medium group-hover:text-slate-900 transition-colors">${fullText}</span>
+                             </label>`;
+                        }).join('');
+                        ingredientsHtml += `<div class="grid grid-cols-1 md:grid-cols-2 gap-1">${itemsHtml}</div>`;
+                    });
+                    ingredientsHtml += '</div>';
+                } catch (e) { ingredientsHtml = `<div class="bg-red-50 p-4 rounded-xl text-red-800 text-sm mb-6">${recipe.ingredients}</div>`; }
+
+                let instructionsHtml = '<div class="mb-10"><h4 class="text-sm font-black text-slate-400 uppercase tracking-[0.2em] mb-6">Preparation</h4>';
+                try {
+                    const instructionsData = JSON.parse(recipe.instructions);
+                    const itemsHtml = instructionsData.map((step, i) => `
+                    <div class="flex gap-4 mb-6 group">
+                        <span class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center font-black text-xs group-hover:bg-indigo-600 group-hover:text-white transition-all">${i+1}</span>
+                        <p class="text-slate-700 leading-relaxed pt-1">${step}</p>
+                    </div>`).join('');
+                    instructionsHtml += `<div class="space-y-2">${itemsHtml}</div></div>`;
+                } catch (e) { instructionsHtml = `<p class="whitespace-pre-wrap text-slate-600">${recipe.instructions}</p></div>`; }
+
+                const ratingsSectionHtml = `<div class="bg-indigo-50/50 p-6 rounded-3xl mt-8 border border-indigo-100/50"><h4 class="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Your Private Review</h4><div class="star-rating mb-4"><input type="radio" id="5-stars" name="rating" value="5" /><label for="5-stars">★</label><input type="radio" id="4-stars" name="rating" value="4" /><label for="4-stars">★</label><input type="radio" id="3-stars" name="rating" value="3" /><label for="3-stars">★</label><input type="radio" id="2-stars" name="rating" value="2" /><label for="2-stars">★</label><input type="radio" id="1-star" name="rating" value="1" /><label for="1-star">★</label></div><textarea id="recipe-notes" class="w-full p-4 border border-slate-200 rounded-2xl bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm shadow-sm" rows="3" placeholder="Notes for next time..."></textarea><div class="text-right mt-3"><button id="save-rating-btn" data-recipe-id="${recipe.id}" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-xl shadow-sm transition-all active:scale-95">Save Update</button></div></div>`;
+                const shareButtonHtml = currentUserEmail ? `<button id="share-recipe-btn" data-recipe-id="${recipe.id}" class="text-slate-400 hover:text-indigo-600 font-bold text-xs uppercase tracking-widest flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>Share Link</button>` : '';
+
+                recipeModalContent.innerHTML = `
+                    ${servesHtml}
+                    ${ingredientsHtml}
+                    <div class="flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-900 text-white p-5 rounded-3xl shadow-lg mb-10">
+                        <div>
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Capture List</p>
+                            <p class="text-xs text-slate-300 leading-tight">Tick ingredients above to save to your list.</p>
+                        </div>
+                        <div class="flex items-center gap-6">
+                            ${shareButtonHtml}
+                            <button id="add-to-list-btn" data-recipe-name="${recipe.name}" class="bg-emerald-500 hover:bg-emerald-600 text-white font-black py-2.5 px-6 rounded-2xl shadow-sm transition-all active:scale-95 text-xs uppercase tracking-widest">Add to Shopping</button>
+                        </div>
+                    </div>
+                    ${instructionsHtml}
+                    <div class="border-t border-slate-100 pt-8 mt-4"><h4 class="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">Meal History</h4><div class="flex items-center gap-4 bg-white border border-slate-100 p-4 rounded-2xl mb-4 shadow-sm"><div class="bg-indigo-50 p-2 rounded-xl text-indigo-600"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div><div><p class="text-sm font-bold text-slate-900">Eaten ${recipe.log_count} times</p><p class="text-[10px] text-slate-400 uppercase font-black">Logged to your history</p></div></div><div class="flex items-center gap-2 flex-wrap"><input type="date" id="eaten-date" class="bg-slate-50 border border-slate-200 p-2 rounded-xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 outline-none"><button id="log-meal-btn" data-recipe-id="${recipe.id}" class="bg-slate-900 text-white font-bold py-2 px-5 rounded-xl shadow-sm hover:bg-black transition-all text-xs uppercase tracking-widest">Log Meal</button></div></div>
+                    ${currentUserEmail ? ratingsSectionHtml : ''}
+                `;
+
+                if (currentUserEmail && recipe.user_rating) {
+                    const starInput = document.querySelector(`.star-rating input[value="${recipe.user_rating}"]`);
+                    if (starInput) starInput.checked = true;
+                }
+                if (currentUserEmail && recipe.user_notes) document.getElementById('recipe-notes').value = recipe.user_notes;
+
+                toggleModal(recipeModal, true);
+                document.querySelector('.modal-scroll-area').scrollTop = 0;
+
+                document.getElementById('add-to-list-btn').addEventListener('click', handleAddToList);
+                document.getElementById('log-meal-btn').addEventListener('click', handleLogMeal);
+                if (currentUserEmail) {
+                    document.getElementById('save-rating-btn').addEventListener('click', handleSaveRating);
+                    if(document.getElementById('share-recipe-btn')) document.getElementById('share-recipe-btn').addEventListener('click', handleShareRecipe);
+                }
+            }
+
+            // --- API Event Handlers ---
+            async function handleShareRecipe(e) {
+                const recipeId = e.target.closest('button').dataset.recipeId;
+                const response = await fetch(`/api/recipes/${recipeId}/share`, { method: 'POST' });
+                if (!response.ok) { showToast('Creation of share link failed.', 'error'); return; }
+                const { token } = await response.json();
+                const shareUrl = `${window.location.origin}/share/${token}`;
+                document.getElementById('share-link-input').value = shareUrl;
+                toggleModal(document.getElementById('share-modal'), true);
+            }
+            
+            async function handleSaveRating(e) {
+                const recipeId = e.target.dataset.recipeId;
+                const ratingInput = document.querySelector('.star-rating input:checked');
+                const rating = ratingInput ? ratingInput.value : null;
+                const notes = document.getElementById('recipe-notes').value;
+                if (!rating) { showToast('Please select a star rating.', 'error'); return; }
+                await fetch('/api/ratings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recipe_id: recipeId, rating: parseInt(rating), notes: notes }) });
+                showToast('Review captured successfully!', 'success');
+                toggleModal(recipeModal, false);
+            }
+
+            async function handleAddToList(e) {
+                const recipeName = e.target.dataset.recipeName;
+                const selectedCheckboxes = document.querySelectorAll('.ingredient-checkbox:checked');
+                if (selectedCheckboxes.length === 0) { showToast('Select items using the checkboxes.', 'error'); return; }
+                const items = Array.from(selectedCheckboxes).map(cb => ({ name: cb.dataset.name, quantity: cb.dataset.quantity, unit: cb.dataset.unit }));
+                await fetch('/api/shopping-list', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items, recipe_name: recipeName }) });
+                showToast(`Added ${items.length} items to list.`, 'success');
+                toggleModal(recipeModal, false);
+            }
+
+            async function handleLogMeal(e) {
+                const recipeId = e.target.dataset.recipeId;
+                const eatenDate = document.getElementById('eaten-date').value;
+                if (!eatenDate) { showToast('Date selection required.', 'error'); return; }
+                await fetch('/api/meal-log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ recipe_id: recipeId, eaten_date: eatenDate, notes: '' }) });
+                showToast('Meal history updated!', 'success');
+                toggleModal(recipeModal, false);
+            }
+
+            // --- Features Logic (Preserved) ---
+            async function showShoppingList() {
+                const response = await fetch('/api/shopping-list');
+                const items = await response.json();
+                const container = document.getElementById('shopping-list-content');
+                container.innerHTML = items.length === 0 ? '<div class="text-center py-10"><p class="text-slate-400 font-bold">List is empty.</p></div>' : '';
+                const grouped = items.reduce((acc, i) => { (acc[i.recipe_name] = acc[i.recipe_name] || []).push(i); return acc; }, {});
+                for (const name in grouped) {
+                    const section = document.createElement('div');
+                    section.className = 'mb-8';
+                    const itemsHtml = grouped[name].map(item => `
+                        <label class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl cursor-pointer transition-all group">
+                            <input type="checkbox" data-id="${item.id}" class="h-5 w-5 rounded-lg border-slate-300 text-emerald-600 shopping-item-checkbox" ${item.is_checked ? 'checked' : ''}>
+                            <span class="${item.is_checked ? 'checked-item' : 'text-slate-700 font-medium'} text-sm">${item.quantity || ''} ${item.unit || ''} ${item.ingredient_name}</span>
+                        </label>`).join('');
+                    section.innerHTML = `<h4 class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 pl-2">${name}</h4><div class="space-y-0.5">${itemsHtml}</div>`;
+                    container.appendChild(section);
+                }
+                toggleModal(document.getElementById('shopping-list-modal'), true);
+            }
+
+            document.getElementById('shopping-list-button').addEventListener('click', showShoppingList);
+            document.getElementById('update-checked-btn').addEventListener('click', async () => {
+                const updates = Array.from(document.querySelectorAll('.shopping-item-checkbox')).map(cb => ({ id: cb.dataset.id, is_checked: cb.checked }));
+                await fetch('/api/shopping-list/update', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ updates }) });
+                showToast('List updated.', 'success'); await showShoppingList();
+            });
+            document.getElementById('clear-checked-items-btn').addEventListener('click', () => {
+                showConfirm('Remove ticked items from the list?', async () => { await fetch('/api/shopping-list/clear', { method: 'DELETE' }); await showShoppingList(); showToast('List cleared.', 'success'); });
+            });
+
+            document.getElementById('meal-log-button').addEventListener('click', async () => {
+                const res = await fetch('/api/meal-log');
+                if (!res.ok) { showToast('Please sign in to view history.', 'error'); return; }
+                const logs = await res.json();
+                const container = document.getElementById('meal-log-content');
+                container.innerHTML = '';
+                if (logs.length === 0) { container.innerHTML = '<p class="text-center text-slate-400 py-10 font-bold">No meal logs recorded.</p>'; }
+                const grouped = logs.reduce((acc, log) => { (acc[log.eaten_date] = acc[log.eaten_date] || []).push(log); return acc; }, {});
+                for (const d in grouped) {
+                    const dayBox = document.createElement('div');
+                    dayBox.className = 'bg-slate-50 p-6 rounded-3xl border border-slate-100';
+                    const dateObj = new Date(d + 'T00:00:00');
+                    const html = grouped[d].map(l => `<li class="font-bold text-slate-800">${l.recipe_name}</li>`).join('');
+                    dayBox.innerHTML = `
+                        <p class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-2">
+                            ${dateObj.toLocaleDateString('en-GB', {weekday:'long'})}
+                        </p>
+                        <h4 class="text-lg font-black text-slate-900 mb-4">${dateObj.toLocaleDateString('en-GB', {year:'numeric',month:'long',day:'numeric'})}</h4>
+                        <ul class="list-disc list-inside space-y-1">${html}</ul>`;
+                    container.appendChild(dayBox);
+                }
+                toggleModal(document.getElementById('meal-log-modal'), true);
+            });
+
+            document.getElementById('meal-planner-button').addEventListener('click', async () => {
+                if (!currentUserEmail) { showToast('Authentication required.', 'error'); return; }
+                document.getElementById('plan-calendar-view').classList.add('hidden');
+                document.getElementById('plan-management-view').classList.remove('hidden');
+                toggleModal(document.getElementById('meal-planner-modal'), true);
+                const res = await fetch('/api/meal-plans');
+                const plans = await res.json();
+                const list = document.getElementById('meal-plans-list');
+                list.innerHTML = plans.length === 0 ? '<div class="col-span-full py-20 text-center"><p class="text-slate-400 font-bold">Start your first plan above.</p></div>' : '';
+                plans.forEach(p => {
+                    const div = document.createElement('div'); 
+                    div.className = 'bg-slate-50 p-5 rounded-2xl border border-slate-200 cursor-pointer hover:border-amber-400 hover:bg-amber-50 transition-all group'; 
+                    div.innerHTML = `<h4 class="font-black text-slate-900 group-hover:text-amber-900 transition-colors">${p.name}</h4><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Open Plan</p>`;
+                    div.addEventListener('click', async () => {
+                        currentMealPlan = p; document.getElementById('meal-planner-title').textContent = p.name;
+                        document.getElementById('plan-management-view').classList.add('hidden');
+                        document.getElementById('plan-calendar-view').classList.remove('hidden');
+                        const detailsRes = await fetch(`/api/meal-plans/${p.id}`);
+                        const details = await detailsRes.json();
+                        const cal = document.getElementById('calendar-body'); cal.innerHTML = '';
+                        ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].forEach(day => {
+                            const cell = document.createElement('div'); cell.className = 'bg-slate-50 border border-slate-200 rounded-2xl p-4 min-h-[160px] drop-zone transition-colors'; cell.dataset.day = day; cell.dataset.mealTime = 'Dinner';
+                            const rList = document.createElement('div'); rList.className = 'recipe-list space-y-2 mt-4';
+                            details.recipes.filter(r => r.day_of_week === day).forEach(r => {
+                                const item = document.createElement('div'); item.className = 'bg-white p-2 rounded-xl text-[11px] text-slate-900 font-bold border border-slate-200 shadow-sm truncate'; item.textContent = r.recipe_name; rList.appendChild(item);
+                            });
+                            cell.innerHTML = `<span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${day}</span>`;
+                            cell.appendChild(rList); cal.appendChild(cell);
+                        });
+                        addDropZoneListeners();
+                    });
+                    list.appendChild(div);
+                });
+            });
+
+            document.getElementById('create-plan-btn').addEventListener('click', async () => {
+                const name = document.getElementById('new-plan-name').value.trim();
+                if (!name) return;
+                await fetch('/api/meal-plans', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+                document.getElementById('new-plan-name').value = ''; showToast('New plan created!', 'success');
+                document.getElementById('meal-planner-button').click();
+            });
+
+            document.getElementById('generate-shopping-list-btn').addEventListener('click', async () => {
+                if (!currentMealPlan) return;
+                showConfirm(`Add all ingredients from "${currentMealPlan.name}" to your list?`, async () => {
+                    const res = await fetch(`/api/meal-plans/${currentMealPlan.id}/shopping-list`, { method: 'POST' });
+                    if (res.ok) { const data = await res.json(); showToast(`${data.items_added} items consolidated.`, 'success'); toggleModal(document.getElementById('meal-planner-modal'), false); }
+                });
+            });
+
+            document.getElementById('back-to-plans-btn').addEventListener('click', () => {
+                document.getElementById('plan-calendar-view').classList.add('hidden'); document.getElementById('plan-management-view').classList.remove('hidden');
+                document.getElementById('meal-planner-button').click();
+            });
+
+            document.getElementById('planner-search-input').addEventListener('input', debounce(() => searchRecipes('nameOrId', document.getElementById('planner-search-input').value, document.getElementById('planner-search-results')), 300));
+
+            // --- UI Helpers ---
+            function handleDragStart(e) { 
+                const data = { id: e.target.dataset.recipeId, name: e.target.dataset.recipeName };
+                e.dataTransfer.setData('text/plain', JSON.stringify(data)); 
+                e.dataTransfer.effectAllowed = "move";
+            }
+            
+            function addDropZoneListeners() {
+                document.querySelectorAll('.drop-zone').forEach(z => {
+                    z.addEventListener('dragover', (e) => { e.preventDefault(); e.currentTarget.classList.add('bg-amber-100', 'border-amber-400'); });
+                    z.addEventListener('dragleave', (e) => { e.preventDefault(); e.currentTarget.classList.remove('bg-amber-100', 'border-amber-400'); });
+                    z.addEventListener('drop', async (e) => {
+                        e.preventDefault(); const target = e.currentTarget; target.classList.remove('bg-amber-100', 'border-amber-400');
+                        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                        const res = await fetch('/api/meal-plan-recipes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ meal_plan_id: currentMealPlan.id, recipe_id: data.id, day_of_week: target.dataset.day, meal_time: target.dataset.mealTime }) });
+                        if (res.ok) { 
+                            showToast(`${data.name} scheduled for ${target.dataset.day}.`, 'success'); 
+                            const item = document.createElement('div'); item.className = 'bg-white p-2 rounded-xl text-[11px] text-slate-900 font-bold border border-slate-200 shadow-sm animate-pulse truncate'; item.textContent = data.name; 
+                            target.querySelector('.recipe-list').appendChild(item); 
+                            setTimeout(() => item.classList.remove('animate-pulse'), 1000);
+                        }
+                    });
+                });
+            }
+
+            const confirmModal = document.getElementById('confirm-modal');
+            const confirmModalText = document.getElementById('confirm-modal-text');
+            const confirmOkBtn = document.getElementById('confirm-ok-btn');
+            const shareModal = document.getElementById('share-modal');
+            let confirmCallback = null;
+
+            function showConfirm(m, onC) { confirmModalText.textContent = m; confirmCallback = onC; toggleModal(confirmModal, true); }
+            confirmOkBtn.addEventListener('click', () => { if (confirmCallback) confirmCallback(); toggleModal(confirmModal, false); });
+            document.getElementById('confirm-cancel-btn').addEventListener('click', () => toggleModal(confirmModal, false));
+            document.getElementById('copy-share-link-btn').addEventListener('click', () => {
+                const input = document.getElementById('share-link-input'); input.select(); document.execCommand('copy'); showToast('Link copied to clipboard.', 'success'); toggleModal(shareModal, false);
+            });
+
+            document.querySelectorAll('.modal-close, .modal-overlay').forEach(b => b.addEventListener('click', () => {
+                document.querySelectorAll('.modal').forEach(m => toggleModal(m, false));
+            }));
+
+            function toggleModal(m, show) { if (!m) return; m.classList.toggle('opacity-0', !show); m.classList.toggle('pointer-events-none', !show); document.body.classList.toggle('modal-active', show); }
+
+            function showToast(m, t = 'success') {
+                const n = document.getElementById('toast-notification'); n.textContent = m; n.className = `toast ${t} show`;
+                setTimeout(() => { n.className = n.className.replace('show', ''); }, 3000);
+            }
+
+            document.getElementById('print-recipe-btn').addEventListener('click', () => {
+                const container = document.getElementById('printable-recipe');
+                container.innerHTML = `<div style="font-family: sans-serif; padding: 40px; line-height: 1.6;"><h1>${document.getElementById('recipe-modal-title').textContent}</h1>${document.getElementById('recipe-modal-content').innerHTML}</div>`;
+                window.print();
+            });
+
+            // Unified Navigation Handlers
+            [document.getElementById('prev-recipe-btn'), document.getElementById('mobile-prev-btn'), document.getElementById('header-prev-btn')]
+                .forEach(btn => btn.addEventListener('click', () => navigateRecipe(-1)));
+
+            [document.getElementById('next-recipe-btn'), document.getElementById('mobile-next-btn'), document.getElementById('header-next-btn')]
+                .forEach(btn => btn.addEventListener('click', () => navigateRecipe(1)));
+            
+            document.addEventListener('keydown', (e) => {
+                if (recipeModal.classList.contains('opacity-0')) return;
+                if (e.key === 'ArrowLeft') navigateRecipe(-1);
+                if (e.key === 'ArrowRight') navigateRecipe(1);
+                if (e.key === 'Escape') toggleModal(recipeModal, false);
+            });
+
+            loadAndDisplayTags();
+            fetch('/api/build-info').then(r => r.json()).then(d => {
+                document.getElementById('build-timestamp').textContent = `System Live: ${new Date(d.timestamp).toLocaleString('en-GB')}`;
+            }).catch(() => { document.getElementById('build-timestamp').textContent = 'System Status: Active'; });
+        });
+    </script>
+</body>
+</html>
