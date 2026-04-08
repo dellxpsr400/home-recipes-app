@@ -175,5 +175,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   // Fallback for any unhandled routes
-  return jsonResponse({ error: "Not Found" }, 404);
+  return context.next();
+
 };
