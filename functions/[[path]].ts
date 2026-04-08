@@ -128,7 +128,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       const ingredients = query.split(',').map(ing => ing.trim().toLowerCase()).filter(ing => ing);
       if (ingredients.length === 0) return jsonResponse([]);
       
-      // This WHERE clause searches for the ingredient name inside the JSON "items" array.
       const whereClauses = ingredients.map(() => 'LOWER(ingredients) LIKE ?');
       const sqlQuery = `SELECT id, name, tags FROM recipes WHERE ${whereClauses.join(' AND ')}`;
       const queryParams = ingredients.map(ing => `%"name":"%${ing}%"`);
@@ -174,7 +173,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
   }
 
-  // Fallback for any unhandled routes
+  // Fallback for any unhandled routes - CRITICAL: Passes through to static HTML/CSS/JS frontend
   return context.next();
-
 };
