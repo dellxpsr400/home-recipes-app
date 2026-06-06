@@ -165,52 +165,51 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return new Response(JSON.stringify(responsePayload), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    // --- AUTOMATION ROUTES ---
+// --- AUTOMATION ROUTES UPDATED---
+if (path === '/api/auto-add' && request.method === 'POST') {
+    const authHeader = request.headers.get('Authorization');
     
-    // POST /api/auto-add - Webhook for n8n to push parsed recipes
-    if (path === '/api/auto-add' && request.method === 'POST') {
-        const authHeader = request.headers.get('Authorization');
-        
-        // Security check: Only allow requests with our specific secret token
-        if (authHeader !== 'Bearer N8N_AUTO_ADD_SECRET_2026') {
-            return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token.' }), {
-                status: 401,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
-
-        const payload = await request.json() as any;
-        const { id, name, tags, ingredients, instructions } = payload;
-
-        if (!id || !name || !ingredients || !instructions) {
-            return new Response(JSON.stringify({ error: 'Missing required recipe fields.' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
-
-        // UPSERT logic: Insert if new, overwrite if it already exists
-        await env.DB.prepare(`
-            INSERT INTO recipes (id, name, tags, ingredients, instructions) 
-            VALUES (?1, ?2, ?3, ?4, ?5)
-            ON CONFLICT(id) DO UPDATE SET 
-                name = excluded.name, 
-                tags = excluded.tags, 
-                ingredients = excluded.ingredients, 
-                instructions = excluded.instructions
-        `).bind(
-            id, 
-            name, 
-            tags || 'Pending Update', 
-            typeof ingredients === 'string' ? ingredients : JSON.stringify(ingredients), 
-            typeof instructions === 'string' ? instructions : JSON.stringify(instructions)
-        ).run();
-
-        return new Response(JSON.stringify({ success: true, message: `Recipe #${id} saved successfully.` }), {
-            status: 201,
-            headers: { 'Content-Type': 'application/json' }
-        });
+    if (authHeader !== 'Bearer N8N_AUTO_ADD_SECRET_2026') {
+        return new Response(JSON.stringify({ error: 'Unauthorized.' }), { status: 401 });
     }
+
+    // Explicitly define the payload structure to resolve 'any' type errors
+    const payload: { 
+        id: number, 
+        name: string, 
+        tags?: string, 
+        ingredients: any, 
+        instructions: any, 
+        serves?: string 
+    } = await request.json();
+
+    const { id, name, tags, ingredients, instructions, serves } = payload;
+
+    if (!id || !name || !ingredients || !instructions) {
+        return new Response(JSON.stringify({ error: 'Missing required fields.' }), { status: 400 });
+    }
+
+    // Execute UPSERT with validated types
+    await env.DB.prepare(`
+        INSERT INTO recipes (id, name, tags, ingredients, instructions, serves) 
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        ON CONFLICT(id) DO UPDATE SET 
+            name = excluded.name, 
+            tags = excluded.tags, 
+            ingredients = excluded.ingredients, 
+            instructions = excluded.instructions,
+            serves = excluded.serves
+    `).bind(
+        id, 
+        name, 
+        tags ?? 'Pending Update', 
+        typeof ingredients === 'string' ? ingredients : JSON.stringify(ingredients), 
+        typeof instructions === 'string' ? instructions : JSON.stringify(instructions),
+        serves ?? null
+    ).run();
+
+    return new Response(JSON.stringify({ success: true }), { status: 201 });
+}
 
     
     // --- SECURE API ROUTES (Login required) ---
