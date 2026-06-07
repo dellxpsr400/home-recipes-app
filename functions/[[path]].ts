@@ -166,7 +166,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
 // --- AUTOMATION ROUTES UPDATED---
-if (path === '/api/auto-add' && request.method === 'POST') {
+// Change this line:
+// if (path === '/api/auto-add' && request.method === 'POST') {
+
+// To this (using .startsWith or adding the slash):
+if (path.startsWith('/api/auto-add') && request.method === 'POST') {
     const authHeader = request.headers.get('Authorization');
     
     if (authHeader !== 'Bearer N8N_AUTO_ADD_SECRET_2026') {
