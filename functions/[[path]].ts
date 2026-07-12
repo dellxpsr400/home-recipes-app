@@ -343,22 +343,47 @@ if (path.startsWith('/api/auto-add') && request.method === 'POST') {
         return new Response(JSON.stringify({ success: true }));
     }
 
-
     // --- MEAL LOG ROUTES ---
     if (path === '/api/meal-log' && request.method === 'GET') {
-      const { results } = await env.DB.prepare(
-        "SELECT ml.eaten_date, r.name as recipe_name FROM meal_log ml JOIN recipes r ON ml.recipe_id = r.id WHERE ml.user_id = ? ORDER BY ml.eaten_date DESC"
-      ).bind(userId).all();
+//      const { results } = await env.DB.prepare(
+//        "SELECT ml.eaten_date, r.name as recipe_name FROM meal_log ml JOIN recipes r ON ml.recipe_id = r.id WHERE ml.user_id = ? ORDER BY ml.eaten_date DESC"
+//      ).bind(userId).all();
+//      return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
+//    }
+//    
+//    if (path.startsWith('/api/meal-log') && request.method === 'POST') {
+//        const { recipe_id, eaten_date, notes } = (await request.json()) as { recipe_id: number; eaten_date: string; notes: string; };
+//       if (!recipe_id || !eaten_date) return new Response('recipe_id and eaten_date are required', { status: 400 });
+//        await env.DB.prepare("INSERT INTO meal_log (recipe_id, eaten_date, user_id, notes) VALUES (?, ?, ?, ?)").bind(recipe_id, eaten_date, userId, notes).run();
+//        return new Response(JSON.stringify({ success: true }), { status: 201 });
+//    }
+  
+// --- MEAL LOG ROUTES --- UPDATED FOR SHARED VIEW
+    // Define shared users
+    const SHARED_USER_GROUP = ['nicolasj.oliver@gmail.com', 'rachelcasey246@gmail.com'];
+
+    if (path === '/api/meal-log' && request.method === 'GET') {
+      // If the current user is in the group, fetch logs for all group members
+      const isShared = SHARED_USER_GROUP.includes(userId);
+      const query = isShared 
+        ? "SELECT ml.eaten_date, r.name as recipe_name FROM meal_log ml JOIN recipes r ON ml.recipe_id = r.id WHERE ml.user_id IN (" + SHARED_USER_GROUP.map(() => '?').join(',') + ") ORDER BY ml.eaten_date DESC"
+        : "SELECT ml.eaten_date, r.name as recipe_name FROM meal_log ml JOIN recipes r ON ml.recipe_id = r.id WHERE ml.user_id = ? ORDER BY ml.eaten_date DESC";
+      
+      const bindings = isShared ? SHARED_USER_GROUP : [userId];
+      
+      const { results } = await env.DB.prepare(query).bind(...bindings).all();
       return new Response(JSON.stringify(results), { headers: { 'Content-Type': 'application/json' } });
     }
     
     if (path.startsWith('/api/meal-log') && request.method === 'POST') {
         const { recipe_id, eaten_date, notes } = (await request.json()) as { recipe_id: number; eaten_date: string; notes: string; };
         if (!recipe_id || !eaten_date) return new Response('recipe_id and eaten_date are required', { status: 400 });
+        
+        // Log entries are still saved under the current user's specific ID for audit/tracking purposes
         await env.DB.prepare("INSERT INTO meal_log (recipe_id, eaten_date, user_id, notes) VALUES (?, ?, ?, ?)").bind(recipe_id, eaten_date, userId, notes).run();
         return new Response(JSON.stringify({ success: true }), { status: 201 });
     }
-    
+
     // --- SHOPPING LIST ROUTES (Secure) ---
     if (path === '/api/shopping-list' && request.method === 'GET') {
       const { results } = await env.DB.prepare(
