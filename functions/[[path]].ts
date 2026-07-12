@@ -344,7 +344,7 @@ if (path.startsWith('/api/auto-add') && request.method === 'POST') {
     }
 
     // --- MEAL LOG ROUTES ---
-    if (path === '/api/meal-log' && request.method === 'GET') {
+//  if (path === '/api/meal-log' && request.method === 'GET') {
 //      const { results } = await env.DB.prepare(
 //        "SELECT ml.eaten_date, r.name as recipe_name FROM meal_log ml JOIN recipes r ON ml.recipe_id = r.id WHERE ml.user_id = ? ORDER BY ml.eaten_date DESC"
 //      ).bind(userId).all();
